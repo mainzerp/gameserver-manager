@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GameServer Manager{% endblock %}</title>
+    <script nonce="{{ request.state.csp_nonce }}">
+        (function(){
+            var t = localStorage.getItem('gsm_theme');
+            if (t === 'light') document.documentElement.classList.remove('dark');
+        })();
+    </script>
+    <!-- Self-hosted fonts -->
+    <link rel="stylesheet" href="/static/css/fonts.css">
+    <!-- Tailwind CSS (compiled) -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+    <style>
+        /* ===== CSS Custom Properties: Light Mode (default) ===== */
+        :root {
+            --clr-bg: #f1f5f9;
+            --clr-sidebar: #ffffff;
+            --clr-sidebar-hover: #f1f5f9;
+            --clr-sidebar-active: rgba(99,102,241,0.10);
+            --clr-panel: #ffffff;
+            --clr-panel-hover: #f8fafc;
+            --clr-input: #f8fafc;
+            --clr-border: #e2e8f0;
+            --clr-border-hover: #6366f1;
+            --clr-toolbar: #f1f5f9;
+
+            --clr-text-primary: #0f172a;
+            --clr-text-secondary: #475569;
+            --clr-text-muted: #94a3b8;
+
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #4f46e5;
+            --clr-accent-subtle: rgba(99,102,241,0.08);
+
+            --clr-success: #16a34a;
+            --clr-success-bg: rgba(22,163,74,0.1);
+            --clr-warning: #ca8a04;
+            --clr-warning-bg: rgba(202,138,4,0.1);
+            --clr-danger: #dc2626;
+            --clr-danger-bg: rgba(220,38,38,0.1);
+            --clr-info: #2563eb;
+            --clr-info-bg: rgba(37,99,235,0.1);
+
+            --console-bg: #f8fafc;
+            --console-text: #166534;
+            --scrollbar-track: #e2e8f0;
+            --scrollbar-thumb: #6366f1;
+
+            --sidebar-width: 260px;
+            --sidebar-collapsed-width: 64px;
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+        }
+
+        /* ===== CSS Custom Properties: Dark Mode ===== */
+        html.dark {
+            --clr-bg: #0c0c1d;
+            --clr-sidebar: #111128;
+            --clr-sidebar-hover: #1a1a3e;
+            --clr-sidebar-active: rgba(99,102,241,0.15);
+            --clr-panel: #151530;
+            --clr-panel-hover: #1a1a3e;
+            --clr-input: #0f0f23;
+            --clr-border: #252547;
+            --clr-border-hover: #6366f1;
+            --clr-toolbar: #111128;
+
+            --clr-text-primary: #e2e8f0;
+            --clr-text-secondary: #94a3b8;
+            --clr-text-muted: #64748b;
+
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #818cf8;
+            --clr-accent-subtle: rgba(99,102,241,0.1);
+
+            --clr-success: #22c55e;
+            --clr-success-bg: rgba(34,197,94,0.12);
+            --clr-warning: #eab308;
+            --clr-warning-bg: rgba(234,179,8,0.12);
+            --clr-danger: #ef4444;
+            --clr-danger-bg: rgba(239,68,68,0.12);
+            --clr-info: #3b82f6;
+            --clr-info-bg: rgba(59,130,246,0.12);
+
+            --console-bg: #0a0a1a;
+            --console-text: #4ade80;
+            --scrollbar-track: #151530;
+            --scrollbar-thumb: #6366f1;
+        }
+
+        /* ===== Base Styles ===== */
+        body {
+            background: var(--clr-bg);
+            color: var(--clr-text-primary);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        * {
+            transition: color var(--transition-fast),
+                        background-color var(--transition-fast),
+                        border-color var(--transition-fast);
+        }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+
+        /* ===== Console ===== */
+        .console-output {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background: var(--console-bg);
+            color: var(--console-text);
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        /* ===== Cards ===== */
+        .card {
+            background: var(--clr-panel);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-md);
+            transition: border-color var(--transition-fast);
+        }
+        .card:hover { border-color: var(--clr-border-hover); }
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--clr-border);
+            font-weight: 600;
+            color: var(--clr-text-primary);
+        }
+        .card-body { padding: 20px; }
+
+        /* ===== Badges ===== */
+        .badge {
+            padding: 2px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .badge-success { background: var(--clr-success-bg); color: var(--clr-success); }
+        .badge-warning { background: var(--clr-warning-bg); color: var(--clr-warning); }
+        .badge-danger { background: var(--clr-danger-bg); color: var(--clr-danger); }
+        .badge-info { background: var(--clr-info-bg); color: var(--clr-info); }
+        .badge-neutral { background: var(--clr-border); color: var(--clr-text-secondary); }
+
+        /* ===== Buttons ===== */
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: none;
+            outline: none;
+        }
+        .btn-primary { background: var(--clr-accent); color: #ffffff; }
+        .btn-primary:hover { background: var(--clr-accent-hover); }
+        .btn-danger { background: var(--clr-danger); color: #ffffff; }
+        .btn-danger:hover { opacity: 0.85; }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--clr-border);
+            color: var(--clr-text-secondary);
+        }
+        .btn-secondary:hover {
+            border-color: var(--clr-accent);
+            color: var(--clr-text-primary);
+        }
+        .btn-sm { padding: 4px 12px; font-size: 12px; }
+
+        /* ===== Inputs ===== */
+        .input-field {
+            background: var(--clr-input);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px;
+            font-size: 14px;
+            color: var(--clr-text-primary);
+            outline: none;
+            width: 100%;
+            transition: border-color var(--transition-fast);
+        }
+        .input-field:focus { border-color: var(--clr-accent); }
+        .input-field::placeholder { color: var(--clr-text-muted); }
+
+        /* ===== Tables ===== */
+        .table-header { background: var(--clr-toolbar); }
+        .table-row { transition: background-color var(--transition-fast); }
+        .table-row:hover { background: var(--clr-panel-hover); }
+
+        /* ===== Progress Bars ===== */
+        .progress-bar {
+            height: 6px;
+            border-radius: 3px;
+            background: var(--clr-input);
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen" style="background: var(--clr-bg);">
+    <main class="max-w-7xl mx-auto px-4 py-4 w-full">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

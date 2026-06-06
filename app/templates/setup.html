@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initial Setup - GameServer Manager</title>
+    <script nonce="{{ request.state.csp_nonce }}">
+        (function(){
+            var t = localStorage.getItem('gsm_theme');
+            if (t === 'light') document.documentElement.classList.remove('dark');
+        })();
+    </script>
+    <!-- Self-hosted fonts -->
+    <link rel="stylesheet" href="/static/css/fonts.css">
+    <!-- Tailwind CSS (compiled) -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+    <style>
+        :root {
+            --clr-bg: #f1f5f9;
+            --clr-panel: #ffffff;
+            --clr-input: #f8fafc;
+            --clr-border: #e2e8f0;
+            --clr-text-primary: #0f172a;
+            --clr-text-secondary: #475569;
+            --clr-text-muted: #94a3b8;
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #4f46e5;
+            --clr-danger: #dc2626;
+            --clr-danger-bg: rgba(220,38,38,0.1);
+            --transition-fast: 150ms ease;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+        }
+        html.dark {
+            --clr-bg: #0c0c1d;
+            --clr-panel: #151530;
+            --clr-input: #0f0f23;
+            --clr-border: #252547;
+            --clr-text-primary: #e2e8f0;
+            --clr-text-secondary: #94a3b8;
+            --clr-text-muted: #64748b;
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #818cf8;
+            --clr-danger: #ef4444;
+            --clr-danger-bg: rgba(239,68,68,0.12);
+            --transition-fast: 150ms ease;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--clr-text-primary);
+            background: linear-gradient(135deg, var(--clr-bg) 0%, var(--clr-panel) 50%, var(--clr-bg) 100%);
+        }
+        * { transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast); }
+        .card {
+            background: var(--clr-panel);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-md);
+        }
+        .input-field {
+            background: var(--clr-input);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            font-size: 14px;
+            color: var(--clr-text-primary);
+            outline: none;
+            width: 100%;
+            transition: border-color var(--transition-fast);
+        }
+        .input-field:focus { border-color: var(--clr-accent); }
+        .input-field::placeholder { color: var(--clr-text-muted); }
+        .btn-primary {
+            background: var(--clr-accent);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all var(--transition-fast);
+        }
+        .btn-primary:hover { background: var(--clr-accent-hover); }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+            <svg class="w-12 h-12 mx-auto mb-3" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+            </svg>
+            <h1 class="text-2xl font-bold" style="color: var(--clr-accent);">GameServer Manager</h1>
+            <p class="text-sm mt-2" style="color: var(--clr-text-muted);">Welcome! Create your administrator account to get started.</p>
+        </div>
+
+        <div class="card p-6">
+            {% if error %}
+            <div class="text-sm rounded-lg px-4 py-3 mb-4" style="background: var(--clr-danger-bg); color: var(--clr-danger);">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form action="/setup" method="post" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="username">Username</label>
+                    <input type="text" id="username" name="username" required autofocus
+                        class="input-field"
+                        minlength="3" maxlength="50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="password">Password</label>
+                    <input type="password" id="password" name="password" required
+                        class="input-field"
+                        minlength="8">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="password_confirm">Confirm Password</label>
+                    <input type="password" id="password_confirm" name="password_confirm" required
+                        class="input-field"
+                        minlength="8">
+                </div>
+                <button type="submit" class="btn-primary w-full">
+                    Create Account
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

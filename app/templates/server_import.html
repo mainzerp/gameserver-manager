@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Import Server - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Import Server</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Import Existing Server</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">Import a pre-existing game server directory into GameServer Manager.</p>
+</div>
+
+<form action="/servers/import" method="post" id="import-form" class="max-w-2xl">
+    {{ csrf_field(request) }}
+    <div class="card p-6 space-y-6">
+
+        {% if errors %}
+        <div class="rounded-lg p-4" style="background: var(--clr-danger-bg); border: 1px solid var(--clr-danger);">
+            <ul class="list-disc list-inside text-sm space-y-1" style="color: var(--clr-danger);">
+                {% for error in errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div>
+            <label class="block text-sm font-medium mb-2" for="path">Server Directory Path</label>
+            <div class="flex gap-2">
+                <input type="text" id="path" name="path" required
+                    value="{{ form_values.get('path', '') }}"
+                    class="input-field flex-1"
+                    placeholder="C:\servers\my-mc-server">
+                <button type="button" id="detect-btn"
+                    class="btn btn-secondary">
+                    Detect
+                </button>
+            </div>
+        </div>
+
+        <div id="detect-result" class="hidden card-body rounded-lg text-sm space-y-1" style="background: var(--clr-input); border: 1px solid var(--clr-border);">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-2" for="name">Server Name</label>
+            <input type="text" id="name" name="name" required
+                minlength="1" maxlength="50" pattern="[-a-zA-Z0-9 _]+"
+                value="{{ form_values.get('name', '') }}"
+                class="input-field"
+                placeholder="My Server">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-2" for="server_type">Server Type</label>
+                <select id="server_type" name="server_type"
+                    class="input-field">
+                    <option value="minecraft_java" {% if form_values.get('server_type') == 'minecraft_java' %}selected{% endif %}>Minecraft Java</option>
+                    <option value="minecraft_bedrock" {% if form_values.get('server_type') == 'minecraft_bedrock' %}selected{% endif %}>Minecraft Bedrock</option>
+                    <option value="steam" {% if form_values.get('server_type') == 'steam' %}selected{% endif %}>Steam</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2" for="port">Port</label>
+                <input type="number" id="port" name="port" value="{{ form_values.get('port', 25565) }}"
+                    min="1024" max="65535"
+                    class="input-field">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-2" for="min_memory">Min RAM (MB)</label>
+                <input type="number" id="min_memory" name="min_memory" value="{{ form_values.get('min_memory', 1024) }}"
+                    min="256" max="32768"
+                    class="input-field">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2" for="max_memory">Max RAM (MB)</label>
+                <input type="number" id="max_memory" name="max_memory" value="{{ form_values.get('max_memory', 2048) }}"
+                    min="256" max="32768"
+                    class="input-field">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-2" for="java_path">Java Path</label>
+            <input type="text" id="java_path" name="java_path" value="{{ form_values.get('java_path', 'java') }}"
+                class="input-field">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-2" for="loader">Mod Loader</label>
+            <select id="loader" name="loader"
+                class="input-field">
+                <option value="">None / Vanilla</option>
+                <option value="fabric" {% if form_values.get('loader') == 'fabric' %}selected{% endif %}>Fabric</option>
+                <option value="paper" {% if form_values.get('loader') == 'paper' %}selected{% endif %}>Paper</option>
+                <option value="forge" {% if form_values.get('loader') == 'forge' %}selected{% endif %}>Forge</option>
+                <option value="neoforge" {% if form_values.get('loader') == 'neoforge' %}selected{% endif %}>NeoForge</option>
+                <option value="quilt" {% if form_values.get('loader') == 'quilt' %}selected{% endif %}>Quilt</option>
+            </select>
+        </div>
+
+        <button type="submit"
+            class="btn btn-primary w-full py-3">
+            Import Server
+        </button>
+    </div>
+</form>
+
+<script nonce="{{ request.state.csp_nonce }}">
+document.getElementById('detect-btn').addEventListener('click', function() {
+    const pathInput = document.getElementById('path');
+    const path = pathInput.value.trim();
+    if (!path) return;
+
+    const resultDiv = document.getElementById('detect-result');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = '<span class="text-gray-400">Detecting...</span>';
+
+    const formData = new FormData();
+    formData.append('path', path);
+
+    fetch('/servers/detect', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': document.querySelector('[name="csrf_token"]').value }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            resultDiv.innerHTML = '<span class="text-red-400">' + data.error + '</span>';
+            return;
+        }
+        resultDiv.innerHTML =
+            '<div class="text-gray-300">Type: <span class="text-accent-400">' + (data.server_type || 'Unknown') + '</span></div>' +
+            '<div class="text-gray-300">Loader: <span class="text-accent-400">' + (data.loader || 'None') + '</span></div>' +
+            '<div class="text-gray-300">Port: <span class="text-accent-400">' + (data.port || 'N/A') + '</span></div>' +
+            '<div class="text-gray-300">Executable: <span class="text-accent-400">' + (data.executable || 'N/A') + '</span></div>';
+
+        if (data.name) document.getElementById('name').value = data.name;
+        if (data.server_type) document.getElementById('server_type').value = data.server_type;
+        if (data.port) document.getElementById('port').value = data.port;
+        if (data.loader) document.getElementById('loader').value = data.loader;
+    })
+    .catch(() => {
+        resultDiv.innerHTML = '<span class="text-red-400">Detection failed.</span>';
+    });
+});
+
+document.getElementById('path').addEventListener('input', function() {
+    const parts = this.value.replace(/\\/g, '/').split('/');
+    const last = parts[parts.length - 1];
+    if (last && !document.getElementById('name').value) {
+        document.getElementById('name').value = last;
+    }
+});
+</script>
+{% endblock %}

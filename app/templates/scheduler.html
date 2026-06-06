@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Task Scheduler - GameServer Manager{% endblock %}
+{% block breadcrumb %}Scheduler{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-6 flex items-center gap-3">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Scheduler</h1>
+    <span class="badge badge-info">{{ tasks | length }} task{{ 's' if tasks | length != 1 else '' }}</span>
+</div>
+
+<!-- Create Task Form -->
+<div class="card mb-6">
+    <div class="card-header">Create Task</div>
+    <div class="card-body">
+        <form action="/scheduler/create" method="post">
+            {{ csrf_field(request) }}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Name</label>
+                    <input type="text" name="name" required placeholder="Daily restart" class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Server</label>
+                    <select name="server_id" required class="input-field">
+                        {% for server in servers %}
+                        <option value="{{ server.id }}">{{ server.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Task Type</label>
+                    <select name="task_type" id="task-type-select" required class="input-field">
+                        {% for tt in task_types %}
+                        <option value="{{ tt }}">{{ tt | title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Cron Expression</label>
+                    <input type="text" name="cron_expression" required placeholder="0 3 * * *" class="input-field">
+                    <p class="text-xs mt-1" style="color: var(--clr-text-muted);">min hour day month weekday (e.g., "0 3 * * *" = daily at 3 AM)</p>
+                </div>
+                <div id="command-field" class="hidden">
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Command</label>
+                    <input type="text" name="command" placeholder="say Server restarting in 5 minutes" class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Condition</label>
+                    <select name="condition" class="input-field">
+                        <option value="always">Always</option>
+                        <option value="only_running">Only if Running</option>
+                        <option value="only_stopped">Only if Stopped</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Task</button>
+        </form>
+    </div>
+</div>
+
+<!-- Task List -->
+{% if tasks %}
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="table-header" style="color: var(--clr-text-secondary);">
+                    <th class="px-4 py-3 text-left font-medium">Name</th>
+                    <th class="px-4 py-3 text-left font-medium">Server</th>
+                    <th class="px-4 py-3 text-left font-medium">Type</th>
+                    <th class="px-4 py-3 text-left font-medium">Cron</th>
+                    <th class="px-4 py-3 text-left font-medium">Condition</th>
+                    <th class="px-4 py-3 text-left font-medium">Status</th>
+                    <th class="px-4 py-3 text-left font-medium">Last Result</th>
+                    <th class="px-4 py-3 text-left font-medium">Duration</th>
+                    <th class="px-4 py-3 text-left font-medium">Next Run</th>
+                    <th class="px-4 py-3 text-left font-medium">Last Run</th>
+                    <th class="px-4 py-3 text-right font-medium">Actions</th>
+                </tr>
+            </thead>
+            <tbody style="border-top: 1px solid var(--clr-border);">
+                {% for task in tasks %}
+                <tr class="table-row" style="border-bottom: 1px solid var(--clr-border);">
+                    <td class="px-4 py-3 font-medium" style="color: var(--clr-text-primary);">{{ task.name }}</td>
+                    <td class="px-4 py-3">
+                        <a href="/servers/{{ task.server_id }}?tab=scheduler" class="text-sm hover:underline" style="color: var(--clr-accent);">
+                            {{ server_map.get(task.server_id, 'Unknown') }}
+                        </a>
+                    </td>
+                    <td class="px-4 py-3" style="color: var(--clr-text-secondary);">{{ task.task_type.value | title }}</td>
+                    <td class="px-4 py-3 font-mono text-xs" style="color: var(--clr-text-secondary);">{{ task.cron_expression }}</td>
+                    <td class="px-4 py-3 text-xs" style="color: var(--clr-text-secondary);">{{ (task.condition or 'always') | replace("_"," ") | title }}</td>
+                    <td class="px-4 py-3">
+                        {% if task.enabled %}
+                        <span class="badge badge-success">Active</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-xs">
+                        {% if task.last_result %}
+                        <span class="{% if task.last_result == 'Success' %}badge badge-success{% elif task.last_result.startswith('Error') %}badge badge-danger{% else %}badge badge-warning{% endif %}">
+                            {{ task.last_result[:30] }}{{ '...' if task.last_result|length > 30 else '' }}
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-xs" style="color: var(--clr-text-secondary);">
+                        {{ '%dms' % task.last_duration_ms if task.last_duration_ms is not none else '-' }}
+                    </td>
+                    <td class="px-4 py-3 text-xs" style="color: var(--clr-text-secondary);">
+                        {{ task.next_run.strftime('%d.%m.%Y %H:%M') if task.next_run else '--' }}
+                    </td>
+                    <td class="px-4 py-3 text-xs" style="color: var(--clr-text-secondary);">
+                        {{ task.last_run.strftime('%d.%m.%Y %H:%M') if task.last_run else 'Never' }}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <form action="/scheduler/{{ task.id }}/run" method="post">
+                                {{ csrf_field(request) }}
+                                <button class="btn btn-sm btn-primary">Run Now</button>
+                            </form>
+                            <form action="/scheduler/{{ task.id }}/toggle" method="post">
+                                {{ csrf_field(request) }}
+                                <button class="btn btn-sm btn-secondary">
+                                    {{ "Disable" if task.enabled else "Enable" }}
+                                </button>
+                            </form>
+                            <form action="/scheduler/{{ task.id }}/delete" method="post"
+                                  data-confirm='Delete this task?'>
+                                {{ csrf_field(request) }}
+                                <button class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card p-12 text-center">
+    <p style="color: var(--clr-text-muted);">No scheduled tasks. Create one above.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+document.getElementById('task-type-select').addEventListener('change', function() {
+    var field = document.getElementById('command-field');
+    if (this.value === 'command') {
+        field.classList.remove('hidden');
+    } else {
+        field.classList.add('hidden');
+    }
+});
+</script>
+{% endblock %}

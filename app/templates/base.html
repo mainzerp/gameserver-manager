@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GameServer Manager{% endblock %}</title>
+    <script nonce="{{ request.state.csp_nonce }}">
+        (function(){
+            var t = localStorage.getItem('gsm_theme');
+            if (t === 'light') document.documentElement.classList.remove('dark');
+        })();
+    </script>
+    <!-- Self-hosted fonts -->
+    <link rel="stylesheet" href="/static/css/fonts.css">
+    <!-- Tailwind CSS (compiled) -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+    <!-- Chart.js -->
+    <script nonce="{{ request.state.csp_nonce }}" src="/static/js/chart.min.js"></script>
+    <style>
+        /* ===== CSS Custom Properties: Light Mode (default) ===== */
+        :root {
+            --clr-bg: #f1f5f9;
+            --clr-sidebar: #ffffff;
+            --clr-sidebar-hover: #f1f5f9;
+            --clr-sidebar-active: rgba(99,102,241,0.10);
+            --clr-panel: #ffffff;
+            --clr-panel-hover: #f8fafc;
+            --clr-input: #f8fafc;
+            --clr-border: #e2e8f0;
+            --clr-border-hover: #6366f1;
+            --clr-toolbar: #f1f5f9;
+
+            --clr-text-primary: #0f172a;
+            --clr-text-secondary: #475569;
+            --clr-text-muted: #94a3b8;
+
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #4f46e5;
+            --clr-accent-subtle: rgba(99,102,241,0.08);
+
+            --clr-success: #16a34a;
+            --clr-success-bg: rgba(22,163,74,0.1);
+            --clr-warning: #ca8a04;
+            --clr-warning-bg: rgba(202,138,4,0.1);
+            --clr-danger: #dc2626;
+            --clr-danger-bg: rgba(220,38,38,0.1);
+            --clr-info: #2563eb;
+            --clr-info-bg: rgba(37,99,235,0.1);
+
+            --console-bg: #f8fafc;
+            --console-text: #166534;
+            --scrollbar-track: #e2e8f0;
+            --scrollbar-thumb: #6366f1;
+
+            --sidebar-width: 260px;
+            --sidebar-collapsed-width: 64px;
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+        }
+
+        /* ===== CSS Custom Properties: Dark Mode ===== */
+        html.dark {
+            --clr-bg: #0c0c1d;
+            --clr-sidebar: #111128;
+            --clr-sidebar-hover: #1a1a3e;
+            --clr-sidebar-active: rgba(99,102,241,0.15);
+            --clr-panel: #151530;
+            --clr-panel-hover: #1a1a3e;
+            --clr-input: #0f0f23;
+            --clr-border: #252547;
+            --clr-border-hover: #6366f1;
+            --clr-toolbar: #111128;
+
+            --clr-text-primary: #e2e8f0;
+            --clr-text-secondary: #94a3b8;
+            --clr-text-muted: #64748b;
+
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #818cf8;
+            --clr-accent-subtle: rgba(99,102,241,0.1);
+
+            --clr-success: #22c55e;
+            --clr-success-bg: rgba(34,197,94,0.12);
+            --clr-warning: #eab308;
+            --clr-warning-bg: rgba(234,179,8,0.12);
+            --clr-danger: #ef4444;
+            --clr-danger-bg: rgba(239,68,68,0.12);
+            --clr-info: #3b82f6;
+            --clr-info-bg: rgba(59,130,246,0.12);
+
+            --console-bg: #0a0a1a;
+            --console-text: #4ade80;
+            --scrollbar-track: #151530;
+            --scrollbar-thumb: #6366f1;
+        }
+
+        /* ===== Base Styles ===== */
+        body {
+            background: var(--clr-bg);
+            color: var(--clr-text-primary);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        * {
+            transition: color var(--transition-fast),
+                        background-color var(--transition-fast),
+                        border-color var(--transition-fast);
+        }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+
+        /* ===== Console ===== */
+        .console-output {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background: var(--console-bg);
+            color: var(--console-text);
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        /* ===== Cards ===== */
+        .card {
+            background: var(--clr-panel);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-md);
+            transition: border-color var(--transition-fast);
+        }
+        .card:hover { border-color: var(--clr-border-hover); }
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--clr-border);
+            font-weight: 600;
+            color: var(--clr-text-primary);
+        }
+        .card-body { padding: 20px; }
+
+        /* ===== Badges ===== */
+        .badge {
+            padding: 2px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .badge-success { background: var(--clr-success-bg); color: var(--clr-success); }
+        .badge-warning { background: var(--clr-warning-bg); color: var(--clr-warning); }
+        .badge-danger { background: var(--clr-danger-bg); color: var(--clr-danger); }
+        .badge-info { background: var(--clr-info-bg); color: var(--clr-info); }
+        .badge-neutral { background: var(--clr-border); color: var(--clr-text-secondary); }
+
+        /* ===== Buttons ===== */
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: none;
+            outline: none;
+        }
+        .btn-primary { background: var(--clr-accent); color: #ffffff; }
+        .btn-primary:hover { background: var(--clr-accent-hover); }
+        .btn-danger { background: var(--clr-danger); color: #ffffff; }
+        .btn-danger:hover { opacity: 0.85; }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--clr-border);
+            color: var(--clr-text-secondary);
+        }
+        .btn-secondary:hover {
+            border-color: var(--clr-accent);
+            color: var(--clr-text-primary);
+        }
+        .btn-sm { padding: 4px 12px; font-size: 12px; }
+
+        /* ===== Inputs ===== */
+        .input-field {
+            background: var(--clr-input);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px;
+            font-size: 14px;
+            color: var(--clr-text-primary);
+            outline: none;
+            width: 100%;
+            transition: border-color var(--transition-fast);
+        }
+        .input-field:focus { border-color: var(--clr-accent); }
+        .input-field::placeholder { color: var(--clr-text-muted); }
+
+        /* ===== Tabs ===== */
+        .tab-nav {
+            display: flex;
+            gap: 2px;
+            border-bottom: 1px solid var(--clr-border);
+            overflow-x: auto;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            color: var(--clr-text-secondary);
+            border-bottom: 2px solid transparent;
+            transition: all var(--transition-fast);
+            cursor: pointer;
+            background: transparent;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+            white-space: nowrap;
+        }
+        .tab-btn:hover { color: var(--clr-text-primary); }
+        .tab-btn-active {
+            color: var(--clr-accent);
+            border-bottom-color: var(--clr-accent);
+        }
+
+        /* ===== Tables ===== */
+        .table-header { background: var(--clr-toolbar); }
+        .table-row { transition: background-color var(--transition-fast); }
+        .table-row:hover { background: var(--clr-panel-hover); }
+
+        /* ===== Status Dots ===== */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot-running { background: var(--clr-success); animation: pulse 2s infinite; }
+        .status-dot-starting { background: var(--clr-warning); animation: pulse 1.5s infinite; }
+        .status-dot-stopped { background: var(--clr-text-muted); }
+        .status-dot-crashed { background: var(--clr-danger); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ===== Progress Bars ===== */
+        .progress-bar {
+            height: 6px;
+            border-radius: 3px;
+            background: var(--clr-input);
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        /* ===== Sidebar ===== */
+        .sidebar-group-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--clr-text-muted);
+            padding: 16px 20px 6px;
+        }
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 20px;
+            font-size: 14px;
+            color: var(--clr-text-secondary);
+            border-left: 3px solid transparent;
+            transition: all var(--transition-fast);
+            text-decoration: none;
+        }
+        .sidebar-link:hover {
+            background: var(--clr-sidebar-hover);
+            color: var(--clr-text-primary);
+        }
+        .sidebar-link-active {
+            background: var(--clr-sidebar-active);
+            color: var(--clr-accent);
+            border-left-color: var(--clr-accent);
+        }
+        .sidebar-link svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+    </style>
+    {% block head %}{% endblock %}
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#6366f1">
+</head>
+<body class="min-h-screen" style="background: var(--clr-bg);">
+    <!-- Offline Banner -->
+    <div id="offline-banner" class="hidden fixed top-0 left-0 right-0 text-center py-1 text-sm z-[60]" style="background: var(--clr-danger); color: #ffffff;">
+        You are currently offline
+    </div>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebar-overlay" class="hidden fixed inset-0 z-40 lg:hidden" style="background: rgba(0,0,0,0.5);"></div>
+
+    {% set current_path = request.url.path %}
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed top-0 left-0 bottom-0 z-50 flex flex-col -translate-x-full lg:translate-x-0" style="width: var(--sidebar-width); background: var(--clr-sidebar); border-right: 1px solid var(--clr-border); transition: transform var(--transition-normal);">
+
+        <!-- Brand -->
+        <div class="flex items-center gap-3 px-5 py-5" style="border-bottom: 1px solid var(--clr-border);">
+            <svg class="w-7 h-7 flex-shrink-0" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+            </svg>
+            <span class="text-lg font-bold" style="color: var(--clr-accent);">GameServer Manager</span>
+        </div>
+
+        <!-- Navigation (scrollable) -->
+        <nav class="flex-1 overflow-y-auto py-2">
+
+            <!-- MAIN -->
+            <div class="sidebar-group-label">{{ _("Main") }}</div>
+
+            <a href="/" class="sidebar-link {% if current_path == '/' %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                {{ _("Dashboard") }}
+            </a>
+
+            <a href="/servers/create" class="sidebar-link {% if current_path == '/servers/create' %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                {{ _("New Server") }}
+            </a>
+
+            <a href="/servers/import" class="sidebar-link {% if current_path == '/servers/import' %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                {{ _("Import") }}
+            </a>
+
+            <a href="/scheduler" class="sidebar-link {% if current_path.startswith('/scheduler') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                {{ _("Scheduler") }}
+            </a>
+
+            <!-- ADMINISTRATION (admin only) -->
+            {% if request.session.get('user_role') == 'admin' %}
+            <div class="sidebar-group-label">{{ _("Administration") }}</div>
+
+            <a href="/users" class="sidebar-link {% if current_path.startswith('/users') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                {{ _("Users") }}
+            </a>
+
+            <a href="/audit" class="sidebar-link {% if current_path.startswith('/audit') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                {{ _("Audit Log") }}
+            </a>
+
+            <a href="/webhooks" class="sidebar-link {% if current_path.startswith('/webhooks') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                {{ _("Webhooks") }}
+            </a>
+
+            <a href="/nodes" class="sidebar-link {% if current_path.startswith('/nodes') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
+                {{ _("Nodes") }}
+            </a>
+
+            <a href="/settings/" class="sidebar-link {% if current_path.startswith('/settings/') and not current_path.startswith('/settings/2fa') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                {{ _("Settings") }}
+            </a>
+            {% endif %}
+
+            <!-- ACCOUNT -->
+            <div class="sidebar-group-label">{{ _("Account") }}</div>
+
+            <a href="/api-keys" class="sidebar-link {% if current_path.startswith('/api-keys') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                {{ _("API Keys") }}
+            </a>
+
+            <a href="/settings/2fa/setup" class="sidebar-link {% if current_path.startswith('/settings/2fa') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                {{ _("Security") }}
+            </a>
+
+            <form action="/logout" method="post" class="mt-1">
+                {{ csrf_field(request) }}
+                <button type="submit" class="sidebar-link w-full text-left" style="color: var(--clr-danger);">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    {{ _("Logout") }}
+                </button>
+            </form>
+
+        </nav>
+
+        <!-- Sidebar Bottom: User Info -->
+        <div class="px-5 py-4" style="border-top: 1px solid var(--clr-border);">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold" style="background: var(--clr-accent-subtle); color: var(--clr-accent);">
+                    {{ request.session.get('username', '?')[0] | upper }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate" style="color: var(--clr-text-primary);">{{ request.session.get('username', '') }}</div>
+                    <div class="text-xs" style="color: var(--clr-text-muted);">{{ request.session.get('user_role', '') | capitalize }}</div>
+                </div>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="lg:ml-[260px] min-h-screen flex flex-col" style="transition: margin var(--transition-normal);">
+
+        <!-- Top Header Bar -->
+        <header class="sticky top-0 z-30 flex items-center gap-4 px-6 py-3" style="background: var(--clr-panel); border-bottom: 1px solid var(--clr-border);">
+
+            <!-- Mobile Hamburger Toggle -->
+            <button id="sidebar-toggle" class="lg:hidden p-1 rounded" style="color: var(--clr-text-secondary);" aria-label="Toggle sidebar">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+
+            <!-- Breadcrumb -->
+            <div class="flex-1 text-sm font-medium" style="color: var(--clr-text-secondary);">
+                {% block breadcrumb %}{% endblock %}
+            </div>
+
+            <!-- Right Actions -->
+            <div class="flex items-center gap-3">
+
+                <!-- Theme Toggle -->
+                <button id="theme-toggle" class="p-2 rounded-lg" style="color: var(--clr-text-secondary); transition: color var(--transition-fast);" title="Toggle theme">
+                    <svg id="theme-icon-dark" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                    <svg id="theme-icon-light" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </button>
+
+                <!-- Language Selector -->
+                <form action="/set-locale" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <select name="locale" data-auto-submit class="text-xs rounded px-2 py-1 focus:outline-none" style="background: var(--clr-input); border: 1px solid var(--clr-border); color: var(--clr-text-secondary);">
+                        <option value="en" {% if request.session.get('locale', 'en') == 'en' %}selected{% endif %}>EN</option>
+                        <option value="de" {% if request.session.get('locale') == 'de' %}selected{% endif %}>DE</option>
+                    </select>
+                </form>
+
+            </div>
+        </header>
+
+        <!-- Update Banner -->
+        <div class="px-6 pt-4">
+            <div id="update-banner" class="hidden rounded-lg p-3 mb-0 flex items-center justify-between" style="background: var(--clr-accent-subtle); border: 1px solid var(--clr-accent);">
+                <span class="text-sm" style="color: var(--clr-accent);">
+                    A new version (<span id="update-version"></span>) is available.
+                    <a id="update-link" href="#" target="_blank" class="underline font-medium">View release</a>
+                </span>
+                <button data-dismiss-click="#update-banner" class="text-sm" style="color: var(--clr-text-muted);">Dismiss</button>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <main class="max-w-7xl mx-auto px-6 py-6 flex-1 w-full">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center text-sm py-6" style="color: var(--clr-text-muted);">
+            GameServer Manager &mdash; Open Source
+        </footer>
+
+    </div>
+
+    <!-- Theme Toggle JS -->
+    <script nonce="{{ request.state.csp_nonce }}">
+    (function() {
+        var html = document.documentElement;
+        var toggle = document.getElementById('theme-toggle');
+        var iconDark = document.getElementById('theme-icon-dark');
+        var iconLight = document.getElementById('theme-icon-light');
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                html.classList.add('dark');
+                iconLight.classList.remove('hidden');
+                iconDark.classList.add('hidden');
+            } else {
+                html.classList.remove('dark');
+                iconDark.classList.remove('hidden');
+                iconLight.classList.add('hidden');
+            }
+            localStorage.setItem('gsm_theme', theme);
+            document.cookie = 'gsm_theme=' + theme + ';path=/;max-age=31536000;SameSite=Lax';
+        }
+
+        var saved = localStorage.getItem('gsm_theme') || 'dark';
+        applyTheme(saved);
+
+        toggle.addEventListener('click', function() {
+            var current = html.classList.contains('dark') ? 'dark' : 'light';
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+    })();
+    </script>
+
+    <!-- Sidebar Toggle JS -->
+    <script nonce="{{ request.state.csp_nonce }}">
+    (function() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebar-overlay');
+        var toggleBtn = document.getElementById('sidebar-toggle');
+
+        function openSidebar() {
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.classList.add('translate-x-0');
+            overlay.classList.remove('hidden');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.add('-translate-x-full');
+            sidebar.classList.remove('translate-x-0');
+            overlay.classList.add('hidden');
+        }
+
+        toggleBtn.addEventListener('click', function() {
+            if (sidebar.classList.contains('-translate-x-full')) {
+                openSidebar();
+            } else {
+                closeSidebar();
+            }
+        });
+
+        overlay.addEventListener('click', closeSidebar);
+
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                overlay.classList.add('hidden');
+                sidebar.classList.remove('translate-x-0');
+            }
+        });
+    })();
+    </script>
+
+    <!-- Update Check JS -->
+    <script nonce="{{ request.state.csp_nonce }}">
+    (function() {
+        fetch('/api/v1/system/updates')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok && data.data && data.data.update_available) {
+                    var banner = document.getElementById('update-banner');
+                    var ver = document.getElementById('update-version');
+                    var link = document.getElementById('update-link');
+                    if (banner && ver) {
+                        ver.textContent = data.data.latest_version;
+                        if (link && data.data.release_url) link.href = data.data.release_url;
+                        banner.classList.remove('hidden');
+                    }
+                }
+            })
+            .catch(function() {});
+    })();
+    </script>
+
+    <!-- Global event handlers for CSP compliance -->
+    <script nonce="{{ request.state.csp_nonce }}">
+    (function() {
+        // data-confirm on forms
+        document.addEventListener('submit', function(e) {
+            var form = e.target.closest('form[data-confirm]');
+            if (form && !form._confirmed) {
+                if (!confirm(form.dataset.confirm)) {
+                    e.preventDefault();
+                } else {
+                    form._confirmed = true;
+                }
+            }
+        });
+        // data-dismiss-click
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-dismiss-click]');
+            if (btn) {
+                var target = document.querySelector(btn.dataset.dismissClick);
+                if (target) target.classList.add('hidden');
+            }
+        });
+        // data-auto-submit
+        document.addEventListener('change', function(e) {
+            var el = e.target.closest('[data-auto-submit]');
+            if (el && el.form) {
+                el.form.submit();
+            }
+        });
+        // data-tab -> switchTab
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-tab]');
+            if (btn && window.switchTab) {
+                window.switchTab(btn.dataset.tab);
+            }
+        });
+        // data-action -> call global function
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-action]');
+            if (btn) {
+                if (btn.dataset.stopPropagation) {
+                    e.stopPropagation();
+                }
+                var fn = window[btn.dataset.action];
+                if (typeof fn === 'function') {
+                    fn();
+                }
+            }
+        });
+        // data-click-action with args
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-click-action]');
+            if (btn) {
+                if (btn.dataset.stopPropagation) {
+                    e.stopPropagation();
+                }
+                var action = btn.dataset.clickAction;
+                var arg = btn.dataset.clickArg;
+                if (action === 'quickAction' && arg) {
+                    var parts = arg.split('|');
+                    if (window.quickAction && parts.length === 2) {
+                        window.quickAction(parts[0], parts[1]);
+                    }
+                } else if (action === 'toggleLevel' && arg && window.toggleLevel) {
+                    window.toggleLevel(arg);
+                } else if (action === 'setAikarFlags' && arg && window.setAikarFlags) {
+                    window.setAikarFlags(arg);
+                } else if (action === 'toggleRename' && window.toggleRename) {
+                    window.toggleRename(btn);
+                } else if (action === 'testWebhook' && arg && window.testWebhook) {
+                    window.testWebhook(arg);
+                } else if (action === 'testNode' && arg && window.testNode) {
+                    window.testNode(arg, btn);
+                } else if (action === 'revokeInvite' && arg && window.revokeInvite) {
+                    window.revokeInvite(arg);
+                }
+            }
+        });
+        // data-change-action
+        document.addEventListener('change', function(e) {
+            var el = e.target.closest('[data-change-action]');
+            if (el) {
+                var action = el.dataset.changeAction;
+                if (action === 'toggleSelectAll' && window.toggleSelectAll) {
+                    window.toggleSelectAll(el);
+                } else if (action === 'updateBulkBar' && window.updateBulkBar) {
+                    window.updateBulkBar();
+                } else if (action === 'syncCheckboxValue') {
+                    var sibling = el.previousElementSibling;
+                    if (sibling) sibling.value = el.checked ? 'true' : 'false';
+                }
+            }
+        });
+        // data-input-action
+        document.addEventListener('input', function(e) {
+            var el = e.target.closest('[data-input-action]');
+            if (el) {
+                var action = el.dataset.inputAction;
+                if (action === 'filterServers' && window.filterServers) {
+                    window.filterServers();
+                }
+            }
+        });
+        // data-keydown-action
+        document.addEventListener('keydown', function(e) {
+            var el = e.target.closest('[data-keydown-action]');
+            if (el) {
+                var action = el.dataset.keydownAction;
+                if (action === 'searchMods' && e.key === 'Enter' && window.searchMods) {
+                    e.preventDefault();
+                    window.searchMods();
+                }
+            }
+        });
+    })();
+    </script>
+
+    <!-- Service Worker & Offline Detection -->
+    <script nonce="{{ request.state.csp_nonce }}">
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/js/sw.js');
+    }
+    window.addEventListener('offline', function() {
+        var b = document.getElementById('offline-banner');
+        if (b) b.classList.remove('hidden');
+    });
+    window.addEventListener('online', function() {
+        var b = document.getElementById('offline-banner');
+        if (b) b.classList.add('hidden');
+    });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

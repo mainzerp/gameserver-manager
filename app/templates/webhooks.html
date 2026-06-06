@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Webhooks - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Webhooks</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold mb-2" style="color: var(--clr-text-primary);">Webhooks</h1>
+    <p style="color: var(--clr-text-secondary);">Configure external webhook endpoints for server event notifications.</p>
+</div>
+
+<!-- Create Webhook -->
+<div class="card p-6 mb-6">
+    <h2 class="font-semibold mb-4" style="color: var(--clr-text-primary);">Add Webhook</h2>
+    <form action="/webhooks/create" method="post" class="space-y-4">
+        {{ csrf_field(request) }}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);" for="wh-name">Name</label>
+                <input type="text" id="wh-name" name="name" required
+                    placeholder="My Webhook"
+                    class="input-field">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);" for="wh-url">URL</label>
+                <input type="url" id="wh-url" name="url" required
+                    placeholder="https://example.com/webhook"
+                    class="input-field">
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);" for="wh-secret">Secret (HMAC signing, optional)</label>
+                <input type="text" id="wh-secret" name="secret"
+                    placeholder="Optional shared secret"
+                    class="input-field">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);">Events</label>
+                <div class="flex flex-wrap gap-3 mt-1">
+                    {% for evt in valid_events %}
+                    <label class="flex items-center gap-1.5 text-sm">
+                        <input type="checkbox" name="events" value="{{ evt }}"
+                            {% if evt in ['start', 'stop', 'crash'] %}checked{% endif %}
+                            class="rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                        {{ evt | title }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);" for="wh-headers">Custom Headers (JSON, optional)</label>
+            <textarea id="wh-headers" name="custom_headers" rows="2"
+                placeholder='{"Authorization": "Bearer token123"}'
+                class="input-field font-mono"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            Create Webhook
+        </button>
+    </form>
+</div>
+
+<!-- Webhook List -->
+<div class="card p-6">
+    <h2 class="font-semibold mb-4" style="color: var(--clr-text-primary);">Configured Webhooks</h2>
+
+    {% if not webhooks %}
+    <p class="text-sm" style="color: var(--clr-text-muted);">No webhooks configured yet.</p>
+    {% else %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="table-header" style="color: var(--clr-text-muted);">
+                    <th class="pb-3 pr-4 text-left">Name</th>
+                    <th class="pb-3 pr-4 text-left">URL</th>
+                    <th class="pb-3 pr-4 text-left">Events</th>
+                    <th class="pb-3 pr-4 text-left">Status</th>
+                    <th class="pb-3 text-left">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for wh in webhooks %}
+                <tr style="border-bottom: 1px solid var(--clr-border);">
+                    <td class="py-3 pr-4" style="color: var(--clr-text-primary);">{{ wh.name }}</td>
+                    <td class="py-3 pr-4 font-mono text-xs max-w-xs truncate" style="color: var(--clr-text-secondary);" title="{{ wh.url }}">
+                        {{ wh.url[:60] }}{% if wh.url | length > 60 %}...{% endif %}
+                    </td>
+                    <td class="py-3 pr-4">
+                        {% for evt in wh.events.split(',') %}
+                        <span class="badge badge-neutral mr-1 mb-1">{{ evt.strip() }}</span>
+                        {% endfor %}
+                    </td>
+                    <td class="py-3 pr-4">
+                        {% if wh.enabled %}
+                        <span class="badge badge-success">Enabled</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-3">
+                        <div class="flex items-center gap-2">
+                            <button type="button" data-click-action="testWebhook" data-click-arg="{{ wh.id }}"
+                                class="btn btn-secondary btn-sm">
+                                Test
+                            </button>
+                            <form action="/webhooks/{{ wh.id }}/delete" method="post" class="inline"
+                                  data-confirm='Delete this webhook?'>
+                                {{ csrf_field(request) }}
+                                <button class="btn btn-danger btn-sm">
+                                    Delete
+                                </button>
+                            </form>
+                        </div>
+                        <span id="test-result-{{ wh.id }}" class="text-xs mt-1 block"></span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+function testWebhook(id) {
+    const el = document.getElementById('test-result-' + id);
+    el.textContent = 'Testing...';
+    el.style.color = 'var(--clr-text-secondary)';
+
+    fetch('/webhooks/' + id + '/test', {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ request.session.get("csrf_token", "") }}'},
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            el.textContent = 'Success (HTTP ' + data.status_code + ')';
+            el.style.color = 'var(--clr-success)';
+        } else {
+            el.textContent = 'Failed: ' + (data.error || 'Unknown error');
+            el.style.color = 'var(--clr-danger)';
+        }
+    })
+    .catch(() => {
+        el.textContent = 'Request failed';
+        el.style.color = 'var(--clr-danger)';
+    });
+}
+</script>
+{% endblock %}

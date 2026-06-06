@@ -1,0 +1,45 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Database
+data/*.db
+data/backups/
+
+# Archives
+*.zip
+
+# Server files (managed by the app)
+servers/
+
+# Node.js (Tailwind CSS build tooling)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Agent-generated documents
+docs/SubAgent/
+
+# Test artifacts
+admin-test-user.md

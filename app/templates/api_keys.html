@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}API Keys - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">API Keys</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-2xl font-bold mb-2" style="color: var(--clr-text-primary);">API Keys</h1>
+    <p style="color: var(--clr-text-secondary);">Manage API keys for programmatic access</p>
+</div>
+
+{% if new_key %}
+<div class="rounded-xl p-6 mb-6" style="background: var(--clr-success-bg); border: 1px solid var(--clr-success);">
+    <h3 class="font-semibold mb-2" style="color: var(--clr-success);">API Key Created</h3>
+    <p class="text-sm mb-3" style="color: var(--clr-text-primary);">Copy your API key now. It will not be shown again.</p>
+    <div class="flex items-center gap-2">
+        <code class="flex-1 px-4 py-2 rounded text-sm font-mono break-all" style="background: var(--console-bg); color: var(--clr-success);" id="new-key-value">{{ new_key }}</code>
+        <button data-action="copyApiKey"
+            class="btn btn-primary flex-shrink-0">
+            Copy
+        </button>
+    </div>
+</div>
+{% endif %}
+
+<!-- Create Key -->
+<div class="card p-6 mb-6">
+    <form action="/api-keys/create" method="post" class="flex items-end gap-4">
+        {{ csrf_field(request) }}
+        <div class="flex-1">
+            <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Key Name</label>
+            <input type="text" name="name" required placeholder="My integration"
+                class="input-field">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            Create Key
+        </button>
+    </form>
+</div>
+
+<!-- Key List -->
+{% if keys %}
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="table-header" style="color: var(--clr-text-muted);">
+                <th class="px-4 py-3 text-left">Prefix</th>
+                <th class="px-4 py-3 text-left">Name</th>
+                <th class="px-4 py-3 text-left">Created</th>
+                <th class="px-4 py-3 text-left">Last Used</th>
+                <th class="px-4 py-3 text-left">Status</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for key in keys %}
+            <tr class="table-row" style="border-top: 1px solid var(--clr-border);">
+                <td class="px-4 py-3 font-mono text-xs" style="color: var(--clr-text-primary);">{{ key.key_prefix }}...</td>
+                <td class="px-4 py-3" style="color: var(--clr-text-primary);">{{ key.name }}</td>
+                <td class="px-4 py-3 text-xs" style="color: var(--clr-text-secondary);">{{ key.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td class="px-4 py-3 text-xs" style="color: var(--clr-text-secondary);">
+                    {{ key.last_used.strftime('%d.%m.%Y %H:%M') if key.last_used else 'Never' }}
+                </td>
+                <td class="px-4 py-3">
+                    {% if key.is_active %}
+                    <span class="badge badge-success">Active</span>
+                    {% else %}
+                    <span class="badge badge-neutral">Revoked</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    {% if key.is_active %}
+                    <form action="/api-keys/{{ key.id }}/revoke" method="post"
+                          data-confirm='Revoke this API key?'>
+                        {{ csrf_field(request) }}
+                        <button class="text-xs transition" style="color: var(--clr-danger);">Revoke</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% else %}
+<div class="card p-12 text-center">
+    <p style="color: var(--clr-text-muted);">No API keys. Create one above.</p>
+</div>
+{% endif %}
+
+<div class="mt-6 card p-6">
+    <h3 class="font-semibold mb-2" style="color: var(--clr-text-primary);">API Usage</h3>
+    <p class="text-sm mb-2" style="color: var(--clr-text-secondary);">Use your API key with the Authorization header:</p>
+    <code class="block px-4 py-2 rounded text-sm font-mono" style="background: var(--console-bg); color: var(--console-text);">
+        curl -H "Authorization: Bearer gsm_..." {{ request.url.scheme }}://{{ request.url.netloc }}/api/v1/servers
+    </code>
+</div>
+{% endblock %}

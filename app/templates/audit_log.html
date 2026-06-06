@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Audit Log - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Audit Log</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold mb-2" style="color: var(--clr-text-primary);">Audit Log</h1>
+    <p class="text-sm" style="color: var(--clr-text-secondary);">Track user actions across the panel</p>
+</div>
+
+<div class="card mb-4 p-4">
+    <div class="flex gap-3 items-end">
+        <div>
+            <label class="block text-xs mb-1" style="color: var(--clr-text-secondary);">Action</label>
+            <select id="filter-action" class="input-field text-sm" style="padding: 0.375rem 0.75rem;">
+                <option value="">All</option>
+                <option value="server.start">server.start</option>
+                <option value="server.stop">server.stop</option>
+                <option value="server.create">server.create</option>
+                <option value="server.delete">server.delete</option>
+                <option value="backup.create">backup.create</option>
+                <option value="backup.restore">backup.restore</option>
+                <option value="mod.install">mod.install</option>
+                <option value="auth.login">auth.login</option>
+                <option value="auth.logout">auth.logout</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs mb-1" style="color: var(--clr-text-secondary);">Resource Type</label>
+            <select id="filter-resource" class="input-field text-sm" style="padding: 0.375rem 0.75rem;">
+                <option value="">All</option>
+                <option value="server">server</option>
+                <option value="backup">backup</option>
+                <option value="mod">mod</option>
+                <option value="file">file</option>
+                <option value="task">task</option>
+                <option value="apikey">apikey</option>
+            </select>
+        </div>
+        <button data-click-action="loadAuditData" data-click-arg="0" class="btn btn-primary" style="padding: 0.375rem 1rem;">Filter</button>
+    </div>
+</div>
+
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="table-header" style="color: var(--clr-text-muted);">
+                <th class="text-left px-4 py-3 font-medium">Time</th>
+                <th class="text-left px-4 py-3 font-medium">User</th>
+                <th class="text-left px-4 py-3 font-medium">Action</th>
+                <th class="text-left px-4 py-3 font-medium">Resource</th>
+                <th class="text-left px-4 py-3 font-medium">Details</th>
+                <th class="text-left px-4 py-3 font-medium">IP</th>
+            </tr>
+        </thead>
+        <tbody id="audit-body">
+            {% for e in entries %}
+            <tr style="border-top: 1px solid var(--clr-border);">
+                <td class="px-4 py-2 text-xs" style="color: var(--clr-text-secondary);">{{ e.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td class="px-4 py-2" style="color: var(--clr-text-primary);">{{ e.username or '-' }}</td>
+                <td class="px-4 py-2"><span class="badge badge-neutral">{{ e.action }}</span></td>
+                <td class="px-4 py-2 text-xs" style="color: var(--clr-text-secondary);">{{ e.resource_type or '' }} {{ e.resource_id or '' }}</td>
+                <td class="px-4 py-2 text-xs truncate max-w-xs" style="color: var(--clr-text-muted);">{{ e.details or '' }}</td>
+                <td class="px-4 py-2 text-xs" style="color: var(--clr-text-muted);">{{ e.ip_address or '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="flex items-center justify-between mt-4 text-sm" style="color: var(--clr-text-secondary);">
+    <span id="audit-count">{{ total }} total entries</span>
+    <div class="flex gap-2">
+        <button id="prev-btn" data-click-action="loadAuditData" data-click-arg="currentOffset - 50" class="btn btn-secondary btn-sm" disabled>Previous</button>
+        <button id="next-btn" data-click-action="loadAuditData" data-click-arg="currentOffset + 50" class="btn btn-secondary btn-sm">Next</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+let currentOffset = 0;
+function loadAuditData(offset) {
+    if (offset < 0) offset = 0;
+    currentOffset = offset;
+    const action = document.getElementById('filter-action').value;
+    const resource = document.getElementById('filter-resource').value;
+    let url = `/audit/data?offset=${offset}&limit=50`;
+    if (action) url += `&action=${action}`;
+    if (resource) url += `&resource_type=${resource}`;
+    fetch(url).then(r => r.json()).then(d => {
+        const body = document.getElementById('audit-body');
+        body.innerHTML = '';
+        d.data.forEach(e => {
+            const ts = e.timestamp ? new Date(e.timestamp).toISOString().replace('T', ' ').substring(0, 19) : '';
+            body.innerHTML += `<tr style="border-top: 1px solid var(--clr-border);">
+                <td class="px-4 py-2 text-xs" style="color: var(--clr-text-secondary);">${ts}</td>
+                <td class="px-4 py-2" style="color: var(--clr-text-primary);">${e.username || '-'}</td>
+                <td class="px-4 py-2"><span class="badge badge-neutral">${e.action}</span></td>
+                <td class="px-4 py-2 text-xs" style="color: var(--clr-text-secondary);">${e.resource_type || ''} ${e.resource_id || ''}</td>
+                <td class="px-4 py-2 text-xs truncate max-w-xs" style="color: var(--clr-text-muted);">${e.details || ''}</td>
+                <td class="px-4 py-2 text-xs" style="color: var(--clr-text-muted);">${e.ip_address || ''}</td>
+            </tr>`;
+        });
+        document.getElementById('audit-count').textContent = d.total + ' total entries';
+        document.getElementById('prev-btn').disabled = offset === 0;
+        document.getElementById('next-btn').disabled = offset + 50 >= d.total;
+    });
+}
+</script>
+{% endblock %}

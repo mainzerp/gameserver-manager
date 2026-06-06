@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}Workshop - {{ server.name }} - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color:var(--clr-text-secondary)">Dashboard</a>
+<span style="color:var(--clr-text-muted)">/</span>
+<a href="/servers/{{ server.id }}" style="color:var(--clr-text-secondary)">{{ server.name }}</a>
+<span style="color:var(--clr-text-muted)">/</span> Workshop
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold" style="color:var(--clr-text-primary);">Workshop Manager</h1>
+            <p class="text-sm mt-1" style="color:var(--clr-text-secondary);">
+                {{ server.name }} - Steam App {{ server.steam_app_id or 'N/A' }}
+            </p>
+        </div>
+        <a href="/servers/{{ server.id }}" class="btn btn-secondary btn-sm">Back to Server</a>
+    </div>
+</div>
+
+<div id="steam-operation-panel" class="card mb-6 hidden">
+    <div class="card-header flex items-center justify-between">
+        <span id="steam-operation-label">SteamCMD</span>
+        <span id="steam-operation-status" class="badge badge-neutral">Idle</span>
+    </div>
+    <div class="card-body space-y-3">
+        <p id="steam-operation-message" class="text-sm" style="color: var(--clr-text-secondary);">No Steam operation is currently running.</p>
+        <div id="steam-operation-progress" class="hidden">
+            <div class="progress-bar">
+                <div id="steam-operation-progress-bar" class="progress-fill" style="width: 0%; background: var(--clr-accent);"></div>
+            </div>
+            <p id="steam-operation-progress-text" class="mt-2 text-xs" style="color: var(--clr-text-muted);">0%</p>
+        </div>
+        <form id="steam-guard-form" class="hidden flex flex-col gap-3 md:flex-row md:items-end">
+            <input type="hidden" id="steam-guard-operation-id">
+            <div class="flex-1">
+                <label class="block text-xs mb-1" style="color: var(--clr-text-secondary);" for="steam-guard-code">Steam Guard Code</label>
+                <input id="steam-guard-code" type="text" inputmode="numeric" autocomplete="one-time-code" class="input-field" placeholder="Enter the current Steam Guard code">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Submit Code</button>
+        </form>
+        <p id="steam-guard-feedback" class="hidden text-xs" style="color: var(--clr-danger);"></p>
+    </div>
+</div>
+
+<!-- Add Workshop Item -->
+<div class="card mb-6">
+    <div class="card-header">Add Workshop Item</div>
+    <div class="card-body">
+        <form action="/servers/{{ server.id }}/workshop/add" method="post" class="flex gap-3 items-end">
+            {{ csrf_field(request) }}
+            <div class="flex-1">
+                <label class="block text-sm font-medium mb-2" for="workshop_id">Workshop Item ID</label>
+                <input type="text" id="workshop_id" name="workshop_id" placeholder="e.g. 1234567890" class="input-field" required>
+                <p class="text-xs mt-1" style="color: var(--clr-text-muted);">
+                    Find item IDs on the Steam Workshop page for the game.
+                </p>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Item</button>
+        </form>
+    </div>
+</div>
+
+<!-- Workshop Items List -->
+<div class="card">
+    <div class="card-header flex items-center justify-between">
+        <span>Workshop Items ({{ items | length }})</span>
+    </div>
+    <div class="card-body">
+        {% if items %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--clr-border);">
+                        <th class="text-left py-3 px-3" style="color: var(--clr-text-muted);">Workshop ID</th>
+                        <th class="text-left py-3 px-3" style="color: var(--clr-text-muted);">Name</th>
+                        <th class="text-left py-3 px-3" style="color: var(--clr-text-muted);">Size</th>
+                        <th class="text-left py-3 px-3" style="color: var(--clr-text-muted);">Status</th>
+                        <th class="text-left py-3 px-3" style="color: var(--clr-text-muted);">Added</th>
+                        <th class="text-right py-3 px-3" style="color: var(--clr-text-muted);">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr style="border-bottom: 1px solid var(--clr-border);">
+                        <td class="py-3 px-3 font-mono text-xs" style="color: var(--clr-text-primary);">
+                            <a href="https://steamcommunity.com/sharedfiles/filedetails/?id={{ item.workshop_id }}"
+                               target="_blank" rel="noopener noreferrer"
+                               style="color: var(--clr-accent);">{{ item.workshop_id }}</a>
+                        </td>
+                        <td class="py-3 px-3" style="color: var(--clr-text-primary);">{{ item.name or 'Unknown' }}</td>
+                        <td class="py-3 px-3" style="color: var(--clr-text-secondary);">
+                            {% if item.file_size %}
+                                {{ item.file_size | filesizeformat }}
+                            {% else %}
+                                --
+                            {% endif %}
+                            {% if item.last_updated %}
+                            <div class="mt-1 text-xs" style="color: var(--clr-text-muted);">Updated {{ item.last_updated.strftime('%d.%m.%Y %H:%M') }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-3">
+                            {% if item.installed %}
+                            <span class="badge badge-success">Installed</span>
+                            {% else %}
+                            <span class="badge badge-neutral">Not installed</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-3 text-xs" style="color: var(--clr-text-muted);">
+                            {{ item.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </td>
+                        <td class="py-3 px-3 text-right">
+                            <div class="flex gap-2 justify-end">
+                                <form action="/servers/{{ server.id }}/workshop/{{ item.id }}/update" method="post" class="inline">
+                                    {{ csrf_field(request) }}
+                                    <button class="btn btn-primary btn-sm">
+                                        {% if item.installed %}Update{% else %}Install{% endif %}
+                                    </button>
+                                </form>
+                                <form action="/servers/{{ server.id }}/workshop/{{ item.id }}/remove" method="post" class="inline"
+                                      data-confirm='Remove this workshop item?'>
+                                    {{ csrf_field(request) }}
+                                    <button class="btn btn-danger btn-sm">Remove</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% if item.description %}
+                    <tr style="border-bottom: 1px solid var(--clr-border);">
+                        <td class="px-3 pb-3"></td>
+                        <td colspan="4" class="px-3 pb-3 text-xs" style="color: var(--clr-text-muted);">{{ item.description }}</td>
+                        <td class="px-3 pb-3"></td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <p class="text-sm" style="color: var(--clr-text-muted);">No workshop items added yet.</p>
+            <p class="text-xs mt-2" style="color: var(--clr-text-muted);">
+                Add items by their Workshop ID from the Steam Workshop.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    const panel = document.getElementById('steam-operation-panel');
+    const label = document.getElementById('steam-operation-label');
+    const message = document.getElementById('steam-operation-message');
+    const status = document.getElementById('steam-operation-status');
+    const progressWrap = document.getElementById('steam-operation-progress');
+    const progressBar = document.getElementById('steam-operation-progress-bar');
+    const progressText = document.getElementById('steam-operation-progress-text');
+    const guardForm = document.getElementById('steam-guard-form');
+    const guardOperationId = document.getElementById('steam-guard-operation-id');
+    const guardInput = document.getElementById('steam-guard-code');
+    const guardFeedback = document.getElementById('steam-guard-feedback');
+    const csrfField = document.querySelector('input[name="csrf_token"]');
+    const csrfToken = csrfField ? csrfField.value : '';
+    const labels = {
+        install: 'Steam Install',
+        update: 'Steam Update',
+        validate: 'Steam Validate',
+        workshop_install: 'Workshop Install',
+        workshop_update: 'Workshop Update'
+    };
+    let reconnectTimer = null;
+    let lastState = null;
+
+    function setStatusBadge(kind, text) {
+        status.className = 'badge';
+        if (kind === 'completed') {
+            status.classList.add('badge-success');
+        } else if (kind === 'failed') {
+            status.classList.add('badge-danger');
+        } else if (kind === 'waiting') {
+            status.classList.add('badge-warning');
+        } else if (kind === 'queued') {
+            status.classList.add('badge-neutral');
+        } else if (kind === 'running') {
+            status.classList.add('badge-info');
+        } else {
+            status.classList.add('badge-neutral');
+        }
+        status.textContent = text;
+    }
+
+    function updateGuardState(show, text, color) {
+        if (show) {
+            guardForm.classList.remove('hidden');
+            guardFeedback.classList.remove('hidden');
+            guardFeedback.style.color = color || 'var(--clr-warning)';
+            guardFeedback.textContent = text || 'Steam Guard input is required to continue.';
+            window.setTimeout(function() { guardInput.focus(); }, 0);
+        } else {
+            guardForm.classList.add('hidden');
+            guardFeedback.classList.add('hidden');
+            guardFeedback.textContent = '';
+            guardInput.value = '';
+        }
+    }
+
+    function applyState(event) {
+        if (!event || event.type === 'heartbeat') {
+            return;
+        }
+        const currentStatus = event.status || event.type || 'idle';
+        lastState = event;
+
+        if (event.type === 'snapshot' && currentStatus === 'idle') {
+            panel.classList.add('hidden');
+            return;
+        }
+
+        panel.classList.remove('hidden');
+        label.textContent = labels[event.operation] || 'SteamCMD';
+        message.textContent = event.message || 'Steam operation in progress.';
+        guardOperationId.value = event.operation_id || '';
+
+        if (currentStatus === 'queued') {
+            setStatusBadge('queued', 'Queued');
+            updateGuardState(false);
+        } else if (currentStatus === 'completed') {
+            setStatusBadge('completed', 'Completed');
+            updateGuardState(false);
+        } else if (currentStatus === 'failed') {
+            setStatusBadge('failed', 'Failed');
+            updateGuardState(false);
+        } else if (currentStatus === 'waiting_for_steam_guard' || event.type === 'steam_guard_required' || event.type === 'steam_guard_invalid') {
+            setStatusBadge('waiting', 'Steam Guard');
+            updateGuardState(true, event.message, event.type === 'steam_guard_invalid' ? 'var(--clr-danger)' : 'var(--clr-warning)');
+        } else {
+            setStatusBadge('running', 'Running');
+            updateGuardState(false);
+        }
+
+        if (currentStatus === 'queued' || currentStatus === 'running' || currentStatus === 'completed' || currentStatus === 'waiting_for_steam_guard') {
+            const percent = typeof event.percent === 'number' ? event.percent : 0;
+            progressWrap.classList.remove('hidden');
+            progressBar.style.width = Math.max(0, Math.min(percent, 100)) + '%';
+            progressText.textContent = Math.round(percent) + '%';
+        } else {
+            progressWrap.classList.add('hidden');
+        }
+    }
+
+    function connect() {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(proto + '//' + location.host + '/ws/steamcmd/{{ server.id }}');
+
+        socket.onmessage = function(event) {
+            applyState(JSON.parse(event.data));
+        };
+
+        socket.onclose = function() {
+            if (lastState && lastState.status && lastState.status !== 'completed' && lastState.status !== 'failed') {
+                panel.classList.remove('hidden');
+                setStatusBadge('waiting', 'Reconnecting');
+                message.textContent = 'Steam progress connection lost. Reconnecting...';
+            }
+            reconnectTimer = window.setTimeout(connect, 2000);
+        };
+    }
+
+    guardForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const operationId = guardOperationId.value;
+        const code = guardInput.value.trim();
+        if (!operationId || !code) {
+            updateGuardState(true, 'Steam Guard code is required.', 'var(--clr-danger)');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('operation_id', operationId);
+        formData.append('steam_guard_code', code);
+        if (csrfToken) {
+            formData.append('csrf_token', csrfToken);
+        }
+
+        fetch('/servers/{{ server.id }}/steam/guard', {
+            method: 'POST',
+            body: formData,
+            headers: csrfToken ? {'X-CSRF-Token': csrfToken} : {}
+        })
+            .then(function(response) {
+                return response.json().then(function(payload) {
+                    return {ok: response.ok, payload: payload};
+                });
+            })
+            .then(function(result) {
+                if (!result.ok || !result.payload.ok) {
+                    updateGuardState(true, result.payload.message || 'Steam Guard submission failed.', 'var(--clr-danger)');
+                    return;
+                }
+                updateGuardState(false);
+                message.textContent = result.payload.message || 'Steam Guard code submitted.';
+                setStatusBadge('running', 'Running');
+            })
+            .catch(function() {
+                updateGuardState(true, 'Steam Guard submission failed.', 'var(--clr-danger)');
+            });
+    });
+
+    connect();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Configuration - {{ server.name }}{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color:var(--clr-text-secondary)">Dashboard</a>
+<span style="color:var(--clr-text-muted)">/</span>
+<a href="/servers/{{ server.id }}" style="color:var(--clr-text-secondary)">{{ server.name }}</a>
+<span style="color:var(--clr-text-muted)">/</span>
+Configuration
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold" style="color:var(--clr-text-primary);">Server Configuration</h1>
+        <a href="/servers/{{ server.id }}" class="btn btn-secondary btn-sm">Back to Server</a>
+    </div>
+    <p class="text-sm mt-1" style="color:var(--clr-text-muted);">
+        Edit server.properties for {{ server.name }}. Changes take effect on next server restart.
+    </p>
+</div>
+
+<!-- Typed Editor -->
+<div id="typed-editor">
+    <form action="/servers/{{ server.id }}/config" method="post">
+        {{ csrf_field(request) }}
+        <input type="hidden" name="_editor_mode" value="typed">
+        <div class="card mb-6">
+            <div class="card-header flex items-center justify-between">
+                <span>Properties</span>
+                <button type="button" class="btn btn-secondary btn-sm" data-action="toggleEditor">Switch to Raw Editor</button>
+            </div>
+            <div class="card-body space-y-4">
+                {% for key, field in schema.items() %}
+                <div class="flex items-center justify-between" {% if not loop.first %}style="border-top:1px solid var(--clr-border);padding-top:16px;"{% endif %}>
+                    <div class="flex-1 pr-4">
+                        <span class="text-sm font-medium" style="color:var(--clr-text-primary);">{{ field.label }}</span>
+                        <p class="text-xs" style="color:var(--clr-text-muted);">{{ key }}</p>
+                    </div>
+                    <div style="min-width:200px;">
+                        {% if field.type == "boolean" %}
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="{{ key }}" value="true"
+                                {% if props.get(key, "true" if field.get("default", False) else "false") == "true" %}checked{% endif %}
+                                class="w-4 h-4 rounded">
+                            <span class="text-sm" style="color:var(--clr-text-secondary);">
+                                {{ "Enabled" if props.get(key, "true" if field.get("default", False) else "false") == "true" else "Disabled" }}
+                            </span>
+                        </label>
+                        {% elif field.type == "enum" %}
+                        <select name="{{ key }}" class="input-field">
+                            {% for option in field.options %}
+                            <option value="{{ option }}" {% if props.get(key, field.get("default", "")) == option %}selected{% endif %}>
+                                {{ option | title }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% elif field.type == "number" %}
+                        <input type="number" name="{{ key }}"
+                            value="{{ props.get(key, field.get('default', '')) }}"
+                            {% if field.min is defined %}min="{{ field.min }}"{% endif %}
+                            {% if field.max is defined %}max="{{ field.max }}"{% endif %}
+                            class="input-field">
+                        {% else %}
+                        <input type="text" name="{{ key }}"
+                            value="{{ props.get(key, field.get('default', '')) }}"
+                            class="input-field">
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="flex justify-end mb-6">
+            <button type="submit" class="btn btn-primary">Save Configuration</button>
+        </div>
+    </form>
+</div>
+
+<!-- Raw Editor (hidden by default) -->
+<div id="raw-editor" class="hidden">
+    <form action="/servers/{{ server.id }}/config" method="post">
+        {{ csrf_field(request) }}
+        <input type="hidden" name="_editor_mode" value="raw">
+        <div class="card mb-6">
+            <div class="card-header flex items-center justify-between">
+                <span>Raw Editor</span>
+                <button type="button" class="btn btn-secondary btn-sm" data-action="toggleEditor">Switch to Typed Editor</button>
+            </div>
+            <div class="card-body">
+                <textarea name="_raw_content" rows="25" class="input-field font-mono text-xs w-full"
+                    style="white-space:pre;overflow-x:auto;">{{ raw_content }}</textarea>
+            </div>
+        </div>
+        <div class="flex justify-end mb-6">
+            <button type="submit" class="btn btn-primary">Save Raw Configuration</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+function toggleEditor() {
+    var typed = document.getElementById('typed-editor');
+    var raw = document.getElementById('raw-editor');
+    typed.classList.toggle('hidden');
+    raw.classList.toggle('hidden');
+}
+</script>
+{% endblock %}

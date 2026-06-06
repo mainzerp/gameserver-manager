@@ -1,0 +1,597 @@
+﻿{% extends "base.html" %}
+{% block title %}Site Settings - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Settings</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Site Settings</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">Configure runtime application settings stored in the database.</p>
+</div>
+
+{% if saved %}
+<div class="text-sm rounded-xl px-4 py-3 mb-4" style="background: var(--clr-success-bg); border: 1px solid var(--clr-success); color: var(--clr-success);">
+    Settings saved successfully.
+</div>
+{% endif %}
+
+<!-- Tab navigation -->
+<div class="tab-nav mb-6" id="tab-nav">
+    <button id="tab-smtp"
+        class="tab-btn tab-btn-active">
+        SMTP
+    </button>
+    <button id="tab-discord"
+        class="tab-btn">
+        Discord
+    </button>
+    <button id="tab-telegram"
+        class="tab-btn">
+        Telegram
+    </button>
+    <button id="tab-totp"
+        class="tab-btn">
+        TOTP
+    </button>
+    <button id="tab-multinode"
+        class="tab-btn">
+        Multi-Node
+    </button>
+    <button id="tab-webauthn"
+        class="tab-btn">
+        WebAuthn
+    </button>
+    <button id="tab-backup"
+        class="tab-btn">
+        Backup Storage
+    </button>
+    <button id="tab-steamcmd"
+        class="tab-btn">
+        SteamCMD
+    </button>
+</div>
+
+<form method="POST" action="/settings/">
+    {{ csrf_field(request) }}
+
+    <!-- SMTP Tab -->
+    <div id="panel-smtp" class="tab-panel">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">SMTP Email Settings</h2>
+
+            <div class="flex items-center gap-3">
+                <input type="checkbox" id="smtp_enabled" name="smtp_enabled" value="true"
+                    {% if s.smtp_enabled %}checked{% endif %}
+                    class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                <label for="smtp_enabled" class="text-sm">Enable SMTP email notifications</label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="smtp_host">SMTP Host</label>
+                    <input type="text" id="smtp_host" name="smtp_host"
+                        value="{{ s.smtp_host or '' }}"
+                        class="input-field"
+                        placeholder="smtp.example.com">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="smtp_port">SMTP Port</label>
+                    <input type="number" id="smtp_port" name="smtp_port"
+                        value="{{ s.smtp_port }}"
+                        class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="smtp_user">SMTP Username</label>
+                    <input type="text" id="smtp_user" name="smtp_user"
+                        value="{{ s.smtp_user or '' }}"
+                        class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="smtp_password">
+                        SMTP Password
+                        {% if has_smtp_password %}
+                        <span class="text-xs" style="color: var(--clr-text-muted);">(leave blank to keep current)</span>
+                        {% endif %}
+                    </label>
+                    <input type="password" id="smtp_password" name="smtp_password"
+                        value=""
+                        autocomplete="new-password"
+                        class="input-field"
+                        placeholder="{% if has_smtp_password %}unchanged{% else %}enter password{% endif %}">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="smtp_from_address">From Address</label>
+                    <input type="email" id="smtp_from_address" name="smtp_from_address"
+                        value="{{ s.smtp_from_address or '' }}"
+                        class="input-field"
+                        placeholder="noreply@example.com">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="smtp_to_addresses">
+                        To Addresses
+                        <span class="text-xs" style="color: var(--clr-text-muted);">(comma-separated)</span>
+                    </label>
+                    <input type="text" id="smtp_to_addresses" name="smtp_to_addresses"
+                        value="{{ s.smtp_to_addresses or '' }}"
+                        class="input-field"
+                        placeholder="admin@example.com, ops@example.com">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <input type="checkbox" id="smtp_use_tls" name="smtp_use_tls" value="true"
+                    {% if s.smtp_use_tls %}checked{% endif %}
+                    class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                <label for="smtp_use_tls" class="text-sm">Use TLS</label>
+            </div>
+
+            <div>
+                <label class="block text-sm mb-2" style="color: var(--clr-text-secondary);">Notify on events</label>
+                <div class="flex flex-wrap gap-4">
+                    {% set smtp_selected = s.smtp_notify_events.split(',') %}
+                    {% for event in smtp_events %}
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="smtp_notify_events" value="{{ event }}"
+                            {% if event in smtp_selected %}checked{% endif %}
+                            class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                        {{ event }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                    class="btn btn-primary">
+                    Save Settings
+                </button>
+                <button type="button" id="btn-test-smtp"
+                    class="btn btn-secondary">
+                    Test SMTP
+                </button>
+                <span id="smtp-test-result" class="text-sm self-center"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discord Tab -->
+    <div id="panel-discord" class="tab-panel hidden">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">Discord Notifications</h2>
+
+            <div>
+                <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="discord_webhook_url">Webhook URL</label>
+                <input type="url" id="discord_webhook_url" name="discord_webhook_url"
+                    value="{{ s.discord_webhook_url or '' }}"
+                    class="input-field"
+                    placeholder="https://discord.com/api/webhooks/...">
+            </div>
+
+            <div>
+                <label class="block text-sm mb-2" style="color: var(--clr-text-secondary);">Notify on events</label>
+                <div class="flex flex-wrap gap-4">
+                    {% set discord_selected = s.discord_notify_events.split(',') %}
+                    {% for event in discord_events %}
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="discord_notify_events" value="{{ event }}"
+                            {% if event in discord_selected %}checked{% endif %}
+                            class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                        {{ event }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                    class="btn btn-primary">
+                    Save Settings
+                </button>
+                <button type="button" id="btn-test-discord"
+                    class="btn btn-secondary">
+                    Test Discord
+                </button>
+                <span id="discord-test-result" class="text-sm self-center"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Telegram Tab -->
+    <div id="panel-telegram" class="tab-panel hidden">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">Telegram Notifications</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="telegram_bot_token">Bot Token</label>
+                    <input type="text" id="telegram_bot_token" name="telegram_bot_token"
+                        value="{{ s.telegram_bot_token or '' }}"
+                        class="input-field"
+                        placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="telegram_chat_id">Chat ID</label>
+                    <input type="text" id="telegram_chat_id" name="telegram_chat_id"
+                        value="{{ s.telegram_chat_id or '' }}"
+                        class="input-field"
+                        placeholder="-1001234567890">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm mb-2" style="color: var(--clr-text-secondary);">Notify on events</label>
+                <div class="flex flex-wrap gap-4">
+                    {% set telegram_selected = (s.telegram_notify_events or 'crash').split(',') %}
+                    {% for event in telegram_events %}
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="telegram_notify_events" value="{{ event }}"
+                            {% if event in telegram_selected %}checked{% endif %}
+                            class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                        {{ event }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                    class="btn btn-primary">
+                    Save Settings
+                </button>
+                <button type="button" id="btn-test-telegram"
+                    class="btn btn-secondary">
+                    Test Telegram
+                </button>
+                <span id="telegram-test-result" class="text-sm self-center"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOTP Tab -->
+    <div id="panel-totp" class="tab-panel hidden">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">TOTP (Two-Factor Authentication)</h2>
+            <p class="text-sm" style="color: var(--clr-text-secondary);">
+                When enabled, two-factor authentication is available for all users. Individual users
+                can still choose to enroll or skip unless you enforce it via policy. TOTP per-user
+                enrollment is managed under each user's profile.
+            </p>
+
+            <div class="flex items-center gap-3">
+                <input type="checkbox" id="totp_global_enabled" name="totp_global_enabled" value="true"
+                    {% if s.totp_global_enabled %}checked{% endif %}
+                    class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                <label for="totp_global_enabled" class="text-sm">Globally enable TOTP support</label>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                    class="btn btn-primary">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Node Tab -->
+    <div id="panel-multinode" class="tab-panel hidden">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">Multi-Node Support</h2>
+            <p class="text-sm" style="color: var(--clr-text-secondary);">
+                Enables distribution of game servers across multiple remote nodes. The node health
+                scheduler starts at application startup. <strong style="color: var(--clr-warning);">Changing
+                this setting requires a restart to take effect.</strong>
+            </p>
+
+            <div class="flex items-center gap-3">
+                <input type="checkbox" id="multi_node_enabled" name="multi_node_enabled" value="true"
+                    {% if s.multi_node_enabled %}checked{% endif %}
+                    class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                <label for="multi_node_enabled" class="text-sm">Enable multi-node support</label>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                    class="btn btn-primary">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebAuthn Tab -->
+    <div id="panel-webauthn" class="tab-panel hidden">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">WebAuthn / Passkeys</h2>
+
+            <div class="rounded-xl p-4 flex items-start gap-3" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+                <svg class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--clr-warning);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <p class="text-sm" style="color: var(--clr-warning);">
+                    Changing the Relying Party ID or Origin will invalidate all existing registered
+                    passkey credentials. Users will need to re-register their passkeys.
+                </p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <input type="checkbox" id="webauthn_enabled" name="webauthn_enabled" value="true"
+                    {% if s.webauthn_enabled %}checked{% endif %}
+                    class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                <label for="webauthn_enabled" class="text-sm">Enable WebAuthn / Passkey authentication</label>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="webauthn_rp_id">Relying Party ID</label>
+                    <input type="text" id="webauthn_rp_id" name="webauthn_rp_id"
+                        value="{{ s.webauthn_rp_id }}"
+                        class="input-field"
+                        placeholder="localhost">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="webauthn_origin">Origin</label>
+                    <input type="url" id="webauthn_origin" name="webauthn_origin"
+                        value="{{ s.webauthn_origin }}"
+                        class="input-field"
+                        placeholder="https://localhost:8443">
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                    class="btn btn-primary">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Storage Tab -->
+    <div id="panel-backup" class="tab-panel hidden">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">Backup External Storage</h2>
+            <p class="text-sm" style="color: var(--clr-text-secondary);">
+                Configure an external path (network share or mounted drive) where backup copies are automatically stored after creation.
+            </p>
+
+            <div>
+                <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="backup_external_path">External Backup Path</label>
+                <input type="text" id="backup_external_path" name="backup_external_path"
+                    value="{{ s.backup_external_path or '' }}"
+                    class="input-field"
+                    placeholder="/mnt/nas/backups or \\\\server\\backups">
+                <p class="text-xs mt-1" style="color: var(--clr-text-muted);">
+                    Leave empty to disable. The directory must exist and be writable by the application.
+                </p>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                    class="btn btn-primary">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SteamCMD Tab -->
+    <div id="panel-steamcmd" class="tab-panel hidden">
+        <div class="card p-6 space-y-5">
+            <h2 class="text-lg font-semibold">SteamCMD Configuration</h2>
+
+            <!-- Status -->
+            <div class="rounded-lg p-4" style="{% if steamcmd_available %}background: rgba(16,185,129,0.1); border: 1px solid var(--clr-success);{% else %}background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);{% endif %}">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        {% if steamcmd_available %}
+                        <svg class="w-5 h-5" style="color: var(--clr-success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span class="text-sm font-medium" style="color: var(--clr-success);">SteamCMD is installed and available</span>
+                        {% else %}
+                        <svg class="w-5 h-5" style="color: var(--clr-warning);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-sm font-medium" style="color: var(--clr-warning);">SteamCMD is not installed</span>
+                        {% endif %}
+                    </div>
+                    {% if not steamcmd_available %}
+                    <form method="post" action="/settings/steamcmd/install">
+                        {{ csrf_field(request) }}
+                        <button type="submit" class="btn btn-primary btn-sm">Install SteamCMD</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);" for="steam_api_key">Steam Web API Key</label>
+                <input type="password" id="steam_api_key" name="steam_api_key"
+                    value="{{ s.steam_api_key or '' }}"
+                    class="input-field"
+                    placeholder="Your Steam Web API key">
+                <p class="text-xs mt-1" style="color: var(--clr-text-muted);">
+                    Optional. Used for Workshop item metadata and build ID checks.
+                    Get one at <a href="https://steamcommunity.com/dev/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--clr-accent);">steamcommunity.com/dev/apikey</a>.
+                </p>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+        </div>
+
+        <!-- Steam Accounts -->
+        <div class="card p-6 space-y-5 mt-6">
+            <h2 class="text-lg font-semibold">Steam Accounts</h2>
+            <p class="text-sm" style="color: var(--clr-text-secondary);">
+                Some game servers require an authenticated Steam account for installation. Credentials are encrypted at rest.
+            </p>
+
+            {% if steam_accounts %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--clr-border);">
+                            <th class="text-left py-2 px-3" style="color: var(--clr-text-muted);">Name</th>
+                            <th class="text-left py-2 px-3" style="color: var(--clr-text-muted);">Username</th>
+                            <th class="text-left py-2 px-3" style="color: var(--clr-text-muted);">Type</th>
+                            <th class="text-right py-2 px-3" style="color: var(--clr-text-muted);">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for acct in steam_accounts %}
+                        <tr style="border-bottom: 1px solid var(--clr-border);">
+                            <td class="py-2 px-3" style="color: var(--clr-text-primary);">{{ acct.display_name }}</td>
+                            <td class="py-2 px-3 font-mono text-xs" style="color: var(--clr-text-primary);">{{ acct.username }}</td>
+                            <td class="py-2 px-3" style="color: var(--clr-text-secondary);">{{ acct.steam_guard_type or 'none' }}</td>
+                            <td class="py-2 px-3 text-right">
+                                <form action="/settings/steam-accounts/{{ acct.id }}/delete" method="post" class="inline"
+                                      data-confirm='Delete this Steam account?'>
+                                    {{ csrf_field(request) }}
+                                    <button class="btn btn-danger btn-sm">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <!-- Add Account Form -->
+            <div class="mt-4 p-4 rounded-lg" style="background: var(--clr-bg-secondary); border: 1px solid var(--clr-border);">
+                <h3 class="text-sm font-semibold mb-3">Add Steam Account</h3>
+                <form action="/settings/steam-accounts/add" method="post" class="space-y-3">
+                    {{ csrf_field(request) }}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs mb-1" style="color: var(--clr-text-muted);" for="sa_display_name">Display Name</label>
+                            <input type="text" id="sa_display_name" name="display_name" class="input-field" placeholder="My Account" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs mb-1" style="color: var(--clr-text-muted);" for="sa_username">Steam Username</label>
+                            <input type="text" id="sa_username" name="username" class="input-field" placeholder="steam_username" required>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs mb-1" style="color: var(--clr-text-muted);" for="sa_password">Steam Password</label>
+                        <input type="password" id="sa_password" name="password" class="input-field" placeholder="Password" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs mb-1" style="color: var(--clr-text-muted);" for="sa_guard_type">Steam Guard Type</label>
+                        <select id="sa_guard_type" name="steam_guard_type" class="input-field">
+                            <option value="none">none</option>
+                            <option value="email">email</option>
+                            <option value="mobile">mobile</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Add Account</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</form>
+
+<script nonce="{{ request.state.csp_nonce }}">
+function switchTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-btn-active'));
+    document.getElementById('panel-' + name).classList.remove('hidden');
+    document.getElementById('tab-' + name).classList.add('tab-btn-active');
+}
+
+async function testSmtp(btn) {
+    const result = document.getElementById('smtp-test-result');
+    btn.disabled = true;
+    result.textContent = 'Testing...';
+    result.style.color = 'var(--clr-text-secondary)';
+    try {
+        const resp = await fetch('/settings/test-smtp', {method: 'POST', headers: {'X-CSRF-Token': '{{ request.session.get("csrf_token", "") }}'}});
+        const data = await resp.json();
+        if (data.ok) {
+            result.textContent = 'Connection successful';
+            result.style.color = 'var(--clr-success)';
+        } else {
+            result.textContent = 'Failed: ' + data.error;
+            result.style.color = 'var(--clr-danger)';
+        }
+    } catch (e) {
+        result.textContent = 'Request failed';
+        result.style.color = 'var(--clr-danger)';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function testDiscord(btn) {
+    const result = document.getElementById('discord-test-result');
+    btn.disabled = true;
+    result.textContent = 'Sending...';
+    result.style.color = 'var(--clr-text-secondary)';
+    try {
+        const resp = await fetch('/settings/test-discord', {method: 'POST', headers: {'X-CSRF-Token': '{{ request.session.get("csrf_token", "") }}'}});
+        const data = await resp.json();
+        if (data.ok) {
+            result.textContent = 'Message sent';
+            result.style.color = 'var(--clr-success)';
+        } else {
+            result.textContent = 'Failed: ' + data.error;
+            result.style.color = 'var(--clr-danger)';
+        }
+    } catch (e) {
+        result.textContent = 'Request failed';
+        result.style.color = 'var(--clr-danger)';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function testTelegram(btn) {
+    const result = document.getElementById('telegram-test-result');
+    btn.disabled = true;
+    result.textContent = 'Sending...';
+    result.style.color = 'var(--clr-text-secondary)';
+    try {
+        const resp = await fetch('/settings/test-telegram', {method: 'POST', headers: {'X-CSRF-Token': '{{ request.session.get("csrf_token", "") }}'}});
+        const data = await resp.json();
+        if (data.ok) {
+            result.textContent = 'Message sent';
+            result.style.color = 'var(--clr-success)';
+        } else {
+            result.textContent = 'Failed: ' + data.error;
+            result.style.color = 'var(--clr-danger)';
+        }
+    } catch (e) {
+        result.textContent = 'Request failed';
+        result.style.color = 'var(--clr-danger)';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab navigation
+    var tabs = ['smtp', 'discord', 'telegram', 'totp', 'multinode', 'webauthn', 'backup', 'steamcmd'];
+    tabs.forEach(function(name) {
+        var btn = document.getElementById('tab-' + name);
+        if (btn) btn.addEventListener('click', function() { switchTab(name); });
+    });
+    // Test buttons
+    var smtpBtn = document.getElementById('btn-test-smtp');
+    if (smtpBtn) smtpBtn.addEventListener('click', function() { testSmtp(this); });
+    var discordBtn = document.getElementById('btn-test-discord');
+    if (discordBtn) discordBtn.addEventListener('click', function() { testDiscord(this); });
+    var telegramBtn = document.getElementById('btn-test-telegram');
+    if (telegramBtn) telegramBtn.addEventListener('click', function() { testTelegram(this); });
+});
+</script>
+{% endblock %}
+

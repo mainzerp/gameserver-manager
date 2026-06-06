@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}User Management - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Users</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">User Management</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">Manage users and their roles</p>
+</div>
+
+<!-- Create User -->
+<div class="card p-6 mb-6">
+    <h2 class="font-semibold mb-4" style="color: var(--clr-text-primary);">Create User</h2>
+    <form action="/users/create" method="post" class="flex flex-wrap gap-3 items-end">
+        {{ csrf_field(request) }}
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);" for="new_username">Username</label>
+            <input type="text" id="new_username" name="username" required minlength="3" maxlength="50"
+                class="input-field w-48"
+                placeholder="Username">
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);" for="new_password">Password</label>
+            <input type="password" id="new_password" name="password" required minlength="8"
+                class="input-field w-48"
+                placeholder="Min 8 characters">
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1" style="color: var(--clr-text-secondary);" for="new_role">Role</label>
+            <select id="new_role" name="role"
+                class="input-field">
+                <option value="viewer">Viewer</option>
+                <option value="operator">Operator</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <button type="submit" class="btn" style="background: var(--clr-success); color: #ffffff;">
+            Create User
+        </button>
+    </form>
+</div>
+
+<!-- User List -->
+<div class="card">
+    <div class="px-6 py-4" style="border-bottom: 1px solid var(--clr-border);">
+        <h2 class="font-semibold" style="color: var(--clr-text-primary);">Users ({{ users | length }})</h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="table-header" style="color: var(--clr-text-muted);">
+                    <th class="px-6 py-3 text-left">Username</th>
+                    <th class="px-6 py-3 text-left">Role</th>
+                    <th class="px-6 py-3 text-left">2FA</th>
+                    <th class="px-6 py-3 text-left">Created</th>
+                    <th class="px-6 py-3 text-left">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr class="table-row" style="border-bottom: 1px solid var(--clr-border);">
+                    <td class="px-6 py-3">
+                        <span class="font-medium" style="color: var(--clr-text-primary);">{{ u.username }}</span>
+                        {% if u.id == current_user.id %}
+                        <span class="text-xs ml-1" style="color: var(--clr-accent);">(you)</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3">
+                        <form action="/users/{{ u.id }}/update" method="post" class="inline flex items-center gap-2">
+                            {{ csrf_field(request) }}
+                            <select name="role" class="input-field text-xs" style="padding: 0.25rem 0.5rem;"
+                                {% if u.id == current_user.id %}disabled{% endif %}>
+                                <option value="viewer" {% if u.role == 'viewer' %}selected{% endif %}>Viewer</option>
+                                <option value="operator" {% if u.role == 'operator' %}selected{% endif %}>Operator</option>
+                                <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>Admin</option>
+                            </select>
+                            {% if u.id != current_user.id %}
+                            <button type="submit" class="text-xs px-2 py-1 rounded transition" style="border: 1px solid var(--clr-border); color: var(--clr-accent);">Save</button>
+                            {% endif %}
+                        </form>
+                    </td>
+                    <td class="px-6 py-3">
+                        {% if u.totp_enabled %}
+                        <span class="badge badge-success">Enabled</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3" style="color: var(--clr-text-secondary);">
+                        {{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '---' }}
+                    </td>
+                    <td class="px-6 py-3">
+                        <div class="flex items-center gap-2">
+                            <a href="/users/{{ u.id }}/access"
+                               style="color: var(--clr-accent);" class="text-xs transition hover:underline">Server Access</a>
+                            {% if u.id != current_user.id %}
+                            <form action="/users/{{ u.id }}/delete" method="post" class="inline"
+                                  data-confirm='Delete user {{ u.username }}?'>
+                                {{ csrf_field(request) }}
+                                <button type="submit" class="text-xs transition" style="color: var(--clr-danger);">Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

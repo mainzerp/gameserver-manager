@@ -1,0 +1,258 @@
+{% extends "base_embed.html" if embed else "base.html" %}
+{% block title %}{{ file_name }} - {{ server.name }}{% endblock %}
+
+{% block breadcrumb %}
+{% if not embed %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/{{ server.id }}" style="color: var(--clr-text-muted);" class="hover:underline">{{ server.name }}</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/{{ server.id }}/files/" style="color: var(--clr-text-muted);" class="hover:underline">Files</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">{{ file_name }}</span>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% set embed_qs = "?embed=1" if embed else "" %}
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">{{ file_name }}</h1>
+        <span class="text-xs font-mono" style="color: var(--clr-text-muted);">{{ file_size }}</span>
+    </div>
+</div>
+
+<!-- Breadcrumbs -->
+<div class="card px-4 py-3 mb-4 flex items-center gap-1 text-sm overflow-x-auto">
+    <svg class="w-4 h-4 flex-shrink-0" style="color: var(--clr-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    </svg>
+    {% for crumb in breadcrumbs %}
+        {% if not loop.last %}
+        <a href="/servers/{{ server.id }}/files/{{ crumb.path }}{{ embed_qs }}"
+           style="color: var(--clr-accent);" class="hover:underline transition whitespace-nowrap">{{ crumb.name }}</a>
+        <span style="color: var(--clr-text-muted);">/</span>
+        {% else %}
+        <span style="color: var(--clr-text-primary);" class="whitespace-nowrap">{{ crumb.name }}</span>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Editor -->
+<form method="POST" action="/servers/{{ server.id }}/files/{{ file_path }}{{ embed_qs }}" id="editor-form">
+    {{ csrf_field(request) }}
+    <div class="card overflow-hidden">
+        <!-- Toolbar -->
+        <div class="flex items-center justify-between px-4 py-2.5" style="background: var(--clr-input); border-bottom: 1px solid var(--clr-border);">
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-mono" style="color: var(--clr-text-muted);" id="cursor-info">Line 1, Column 1</span>
+                <span class="text-xs px-2 py-0.5 rounded" style="background: var(--clr-border); color: var(--clr-text-secondary);" id="change-indicator" style="display: none;">
+                    Unsaved
+                </span>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/servers/{{ server.id }}/files/download/{{ file_path }}"
+                   class="btn btn-secondary btn-sm">
+                    Download
+                </a>
+                <a href="/servers/{{ server.id }}/files/{{ parent_path }}{{ embed_qs }}"
+                   class="btn btn-secondary btn-sm">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="btn btn-primary btn-sm"
+                        id="save-btn">
+                    Save
+                </button>
+            </div>
+        </div>
+
+        <!-- Line numbers + textarea -->
+        <div class="flex overflow-hidden" style="height: 70vh;">
+            <div class="text-xs font-mono text-right select-none py-3"
+                 id="line-numbers" style="min-width: 3.5rem; padding-right: 0.75rem; padding-left: 0.5rem; background: var(--console-bg); color: var(--clr-text-muted); border-right: 1px solid var(--clr-border); white-space: pre; line-height: 1.5rem; overflow: hidden;">
+            </div>
+            <textarea name="content"
+                      id="editor"
+                      class="flex-1 font-mono text-sm p-3 resize-none outline-none border-none"
+                      spellcheck="false"
+                      wrap="off"
+                      style="tab-size: 4; background: var(--clr-panel); color: var(--clr-text-primary); line-height: 1.5rem;">{{ content }}</textarea>
+        </div>
+
+        <!-- CodeMirror container (replaces textarea when CM loads) -->
+        <div id="cm-container" class="hidden" style="height: 70vh; overflow: auto;"></div>
+    </div>
+</form>
+
+<!-- Keyboard shortcuts hint -->
+<div class="mt-3 text-xs text-center" style="color: var(--clr-text-muted);">
+    <kbd class="px-1.5 py-0.5 rounded" style="background: var(--clr-input); border: 1px solid var(--clr-border); color: var(--clr-text-secondary);">Ctrl</kbd> +
+    <kbd class="px-1.5 py-0.5 rounded" style="background: var(--clr-input); border: 1px solid var(--clr-border); color: var(--clr-text-secondary);">S</kbd> to save
+</div>
+
+<link rel="stylesheet" href="/static/vendor/codemirror/codemirror.min.css">
+<link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.min.css">
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/codemirror.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/mode/properties.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/mode/yaml.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/mode/javascript.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/mode/xml.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/mode/toml.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/mode/shell.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}" src="/static/vendor/codemirror/mode/markdown.min.js"></script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var editor = document.getElementById('editor');
+    var lineNumbers = document.getElementById('line-numbers');
+    var cursorInfo = document.getElementById('cursor-info');
+    var changeIndicator = document.getElementById('change-indicator');
+    var form = document.getElementById('editor-form');
+    var originalContent = editor.value;
+    var cmInstance = null;
+
+    // Map file extensions to CodeMirror modes
+    var modeMap = {
+        '.properties': 'text/x-properties',
+        '.yml': 'text/x-yaml', '.yaml': 'text/x-yaml',
+        '.json': 'application/json', '.mcmeta': 'application/json',
+        '.xml': 'application/xml',
+        '.toml': 'text/x-toml',
+        '.cfg': 'text/x-properties', '.ini': 'text/x-properties', '.conf': 'text/x-properties',
+        '.sh': 'text/x-sh', '.bat': 'text/x-sh', '.cmd': 'text/x-sh',
+        '.md': 'text/x-markdown',
+        '.lang': 'text/x-properties',
+    };
+
+    var fileName = '{{ file_name }}';
+    var ext = fileName.lastIndexOf('.') >= 0 ? fileName.substring(fileName.lastIndexOf('.')).toLowerCase() : '';
+    var mode = modeMap[ext] || '';
+
+    // Try to init CodeMirror
+    if (typeof CodeMirror !== 'undefined') {
+        var cmContainer = document.getElementById('cm-container');
+        var editorWrapper = editor.parentElement;
+
+        cmInstance = CodeMirror(cmContainer, {
+            value: editor.value,
+            mode: mode,
+            theme: 'material-darker',
+            lineNumbers: true,
+            lineWrapping: false,
+            indentUnit: 4,
+            tabSize: 4,
+            indentWithTabs: false,
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            extraKeys: {
+                'Ctrl-S': function() { syncAndSubmit(); },
+                'Cmd-S': function() { syncAndSubmit(); },
+            },
+        });
+
+        cmContainer.classList.remove('hidden');
+        editorWrapper.classList.add('hidden');
+        lineNumbers.parentElement.classList.add('hidden');
+
+        cmInstance.on('change', function() {
+            editor.value = cmInstance.getValue();
+            if (cmInstance.getValue() !== originalContent) {
+                changeIndicator.style.display = 'inline';
+            } else {
+                changeIndicator.style.display = 'none';
+            }
+        });
+
+        cmInstance.on('cursorActivity', function() {
+            var pos = cmInstance.getCursor();
+            cursorInfo.textContent = 'Line ' + (pos.line + 1) + ', Column ' + (pos.ch + 1);
+        });
+
+        function syncAndSubmit() {
+            editor.value = cmInstance.getValue();
+            form.submit();
+        }
+
+        // Also sync on form submit
+        form.addEventListener('submit', function() {
+            editor.value = cmInstance.getValue();
+        });
+
+        // Warn before leaving with unsaved changes
+        window.addEventListener('beforeunload', function(e) {
+            if (cmInstance.getValue() !== originalContent) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Set proper height
+        cmInstance.setSize(null, '70vh');
+
+    } else {
+        // Fallback: plain textarea mode
+        function updateLineNumbers() {
+            var lines = editor.value.split('\n').length;
+            var nums = [];
+            for (var i = 1; i <= lines; i++) { nums.push(i); }
+            lineNumbers.textContent = nums.join('\n');
+        }
+
+        function updateCursorInfo() {
+            var val = editor.value.substring(0, editor.selectionStart);
+            var line = val.split('\n').length;
+            var col = editor.selectionStart - val.lastIndexOf('\n');
+            cursorInfo.textContent = 'Line ' + line + ', Column ' + col;
+        }
+
+        function checkChanges() {
+            if (editor.value !== originalContent) {
+                changeIndicator.style.display = 'inline';
+            } else {
+                changeIndicator.style.display = 'none';
+            }
+        }
+
+        function syncScroll() {
+            lineNumbers.scrollTop = editor.scrollTop;
+        }
+
+        editor.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                var start = this.selectionStart;
+                var end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+                updateLineNumbers();
+                checkChanges();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                form.submit();
+            }
+        });
+
+        editor.addEventListener('input', function() {
+            updateLineNumbers();
+            checkChanges();
+        });
+
+        editor.addEventListener('click', updateCursorInfo);
+        editor.addEventListener('keyup', updateCursorInfo);
+        editor.addEventListener('scroll', syncScroll);
+
+        window.addEventListener('beforeunload', function(e) {
+            if (editor.value !== originalContent) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        updateLineNumbers();
+        updateCursorInfo();
+    }
+})();
+</script>
+{% endblock %}

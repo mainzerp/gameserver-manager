@@ -1,0 +1,64 @@
+services:
+  gameserver-manager:
+    build: .
+    container_name: gameserver_manager
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+      # - "2222:2222"               # SFTP access (enable when GSM_SFTP_ENABLED=true)
+      - "25565-25575:25565-25575"   # Minecraft Java
+      - "19132:19132/udp"            # Minecraft Bedrock
+      - "27015-27020:27015-27020"    # Steam game servers
+      - "27015-27020:27015-27020/udp"
+    environment:
+      - TZ=Europe/Berlin
+      - GSM_DEBUG=false
+      # Generate a key: python -c "import secrets; print(secrets.token_hex(32))"
+      - GSM_SECRET_KEY=${GSM_SECRET_KEY:?Set GSM_SECRET_KEY in .env}
+      - PYTHONUNBUFFERED=1
+      - GSM_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-gsm}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gameserver}
+      - GSM_SSL_ENABLED=true
+      - GSM_SSL_CERTFILE=/app/certs/cert.pem
+      - GSM_SSL_KEYFILE=/app/certs/key.pem
+      - GSM_STEAMCMD_PATH=/opt/steamcmd/steamcmd.sh
+      # All other settings (SMTP, Discord, TOTP, Multi-Node, WebAuthn) are
+      # configurable via the web UI at /settings/ (admin only).
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:8443/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    volumes:
+      - gsm_data:/app/data
+      - gsm_servers:/app/servers
+      - gsm_certs:/app/certs
+      - gsm_steamcmd:/opt/steamcmd
+      # - /var/run/docker.sock:/var/run/docker.sock  # Required for Docker isolation
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # PostgreSQL database
+  db:
+    image: postgres:17-alpine
+    container_name: gsm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gameserver}
+      POSTGRES_USER: ${POSTGRES_USER:-gsm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gsm} -d ${POSTGRES_DB:-gameserver}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  gsm_data:
+  gsm_servers:
+  pgdata:
+  gsm_certs:
+  gsm_steamcmd:

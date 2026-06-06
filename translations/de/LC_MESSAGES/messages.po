@@ -1,0 +1,211 @@
+# German translations for GameServer Manager.
+# This file is distributed under the same license as the project.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: GameServer Manager 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-31 15:00+0000\n"
+"PO-Revision-Date: 2026-03-31 15:00+0000\n"
+"Last-Translator: \n"
+"Language: de\n"
+"Language-Team: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Dashboard"
+msgstr "Startseite"
+
+msgid "Scheduler"
+msgstr "Zeitplaner"
+
+msgid "New Server"
+msgstr "Neuer Server"
+
+msgid "Import"
+msgstr "Importieren"
+
+msgid "API Keys"
+msgstr "API-Schluessel"
+
+msgid "Users"
+msgstr "Benutzer"
+
+msgid "Audit Log"
+msgstr "Protokoll"
+
+msgid "Webhooks"
+msgstr "Webhooks"
+
+msgid "Logout"
+msgstr "Abmelden"
+
+msgid "Your game servers at a glance"
+msgstr "Ihre Spieleserver auf einen Blick"
+
+msgid "No servers found"
+msgstr "Keine Server gefunden"
+
+msgid "Create your first game server to get started."
+msgstr "Erstellen Sie Ihren ersten Spieleserver, um zu beginnen."
+
+msgid "Create Server"
+msgstr "Server erstellen"
+
+msgid "Sign In"
+msgstr "Anmelden"
+
+msgid "Username"
+msgstr "Benutzername"
+
+msgid "Password"
+msgstr "Passwort"
+
+msgid "Invalid username or password."
+msgstr "Ungueltiger Benutzername oder Passwort."
+
+msgid "Console"
+msgstr "Konsole"
+
+msgid "Online"
+msgstr "Online"
+
+msgid "Offline"
+msgstr "Offline"
+
+msgid "Start"
+msgstr "Starten"
+
+msgid "Stop"
+msgstr "Stoppen"
+
+msgid "Restart"
+msgstr "Neustart"
+
+msgid "Server Details"
+msgstr "Serverdetails"
+
+msgid "Files"
+msgstr "Dateien"
+
+msgid "Backups"
+msgstr "Sicherungen"
+
+msgid "Delete Server"
+msgstr "Server loeschen"
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Language"
+msgstr "Sprache"
+
+msgid "Players"
+msgstr "Spieler"
+
+msgid "Manage Players"
+msgstr "Spieler verwalten"
+
+msgid "Online Players"
+msgstr "Online-Spieler"
+
+msgid "No players online"
+msgstr "Keine Spieler online"
+
+msgid "Server offline"
+msgstr "Server offline"
+
+msgid "Refresh"
+msgstr "Aktualisieren"
+
+# SteamCMD-Integration
+msgid "SteamCMD"
+msgstr "SteamCMD"
+
+msgid "Steam Information"
+msgstr "Steam-Informationen"
+
+msgid "Steam App ID"
+msgstr "Steam App-ID"
+
+msgid "Steam Branch"
+msgstr "Steam-Branch"
+
+msgid "Anonymous Login"
+msgstr "Anonyme Anmeldung"
+
+msgid "Update on Start"
+msgstr "Update beim Start"
+
+msgid "Update Server"
+msgstr "Server aktualisieren"
+
+msgid "Validate Files"
+msgstr "Dateien validieren"
+
+msgid "Workshop"
+msgstr "Workshop"
+
+msgid "Workshop Items"
+msgstr "Workshop-Elemente"
+
+msgid "Workshop Item ID"
+msgstr "Workshop-Element-ID"
+
+msgid "Add Item"
+msgstr "Element hinzufuegen"
+
+msgid "Install SteamCMD"
+msgstr "SteamCMD installieren"
+
+msgid "SteamCMD is installed and available"
+msgstr "SteamCMD ist installiert und verfuegbar"
+
+msgid "SteamCMD is not installed"
+msgstr "SteamCMD ist nicht installiert"
+
+msgid "Steam Accounts"
+msgstr "Steam-Konten"
+
+msgid "Add Steam Account"
+msgstr "Steam-Konto hinzufuegen"
+
+msgid "Steam Web API Key"
+msgstr "Steam Web-API-Schluessel"
+
+msgid "Build ID"
+msgstr "Build-ID"
+
+msgid "Last Updated"
+msgstr "Zuletzt aktualisiert"
+
+msgid "SteamCMD detected"
+msgstr "SteamCMD erkannt"
+
+msgid "SteamCMD not installed"
+msgstr "SteamCMD nicht installiert"
+
+msgid "Steam server updated successfully"
+msgstr "Steam-Server erfolgreich aktualisiert"
+
+msgid "Steam server validated successfully"
+msgstr "Steam-Server erfolgreich validiert"
+
+msgid "Workshop item added"
+msgstr "Workshop-Element hinzugefuegt"
+
+msgid "Workshop item removed"
+msgstr "Workshop-Element entfernt"
+
+msgid "Workshop item installed"
+msgstr "Workshop-Element installiert"
+
+msgid "SteamCMD installation started"
+msgstr "SteamCMD-Installation gestartet"
+
+msgid "Steam account added"
+msgstr "Steam-Konto hinzugefuegt"
+
+msgid "Steam account deleted"
+msgstr "Steam-Konto geloescht"

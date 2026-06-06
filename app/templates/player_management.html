@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Player Management - {{ server.name }} - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/{{ server.id }}" style="color: var(--clr-text-muted);" class="hover:underline">{{ server.name }}</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Players</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Player Management</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">
+        Manage whitelist and ban list for {{ server.name }}
+    </p>
+    {% if is_running and server.rcon_enabled %}
+    <p class="text-xs mt-2" style="color: var(--clr-success);">Server is running with RCON enabled -- changes apply immediately.</p>
+    {% elif is_running %}
+    <p class="text-xs mt-2" style="color: var(--clr-warning);">Server is running but RCON is not enabled. File changes will take effect on restart.</p>
+    {% else %}
+    <p class="text-xs mt-2" style="color: var(--clr-text-muted);">Server is offline. Changes are applied via file edits.</p>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Whitelist -->
+    <div class="card p-6">
+        <h2 class="font-semibold mb-4" style="color: var(--clr-text-primary);">Whitelist</h2>
+
+        <form action="/servers/{{ server.id }}/whitelist/add" method="post" class="flex gap-2 mb-4">
+            {{ csrf_field(request) }}
+            <input type="text" name="name" required placeholder="Player name"
+                pattern="[a-zA-Z0-9_]{1,16}" title="Minecraft username (1-16 characters, letters/numbers/underscore)"
+                class="flex-1 input-field">
+            <button type="submit" class="btn btn-primary">
+                Add
+            </button>
+        </form>
+
+        {% if whitelist %}
+        <div class="space-y-1 max-h-80 overflow-y-auto">
+            {% for player in whitelist %}
+            <div class="flex items-center justify-between py-2 px-3 rounded transition text-sm" style="hover: background: var(--clr-input);">
+                <div>
+                    <span style="color: var(--clr-text-primary);">{{ player.name }}</span>
+                    {% if player.uuid %}
+                    <span class="text-xs ml-2" style="color: var(--clr-text-muted);">{{ player.uuid[:8] }}...</span>
+                    {% endif %}
+                </div>
+                <form action="/servers/{{ server.id }}/whitelist/remove" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <input type="hidden" name="name" value="{{ player.name }}">
+                    <button class="btn btn-danger btn-sm">
+                        Remove
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-xs mt-3" style="color: var(--clr-text-muted);">{{ whitelist | length }} player(s) whitelisted</p>
+        {% else %}
+        <p class="text-sm" style="color: var(--clr-text-muted);">No players on the whitelist.</p>
+        {% endif %}
+    </div>
+
+    <!-- Ban List -->
+    <div class="card p-6">
+        <h2 class="font-semibold mb-4" style="color: var(--clr-text-primary);">Ban List</h2>
+
+        <form action="/servers/{{ server.id }}/ban" method="post" class="flex gap-2 mb-4">
+            {{ csrf_field(request) }}
+            <input type="text" name="name" required placeholder="Player name"
+                pattern="[a-zA-Z0-9_]{1,16}" title="Minecraft username (1-16 characters, letters/numbers/underscore)"
+                class="flex-1 input-field">
+            <input type="text" name="reason" placeholder="Reason (optional)"
+                maxlength="200"
+                class="flex-1 input-field">
+            <button type="submit" class="btn btn-danger">
+                Ban
+            </button>
+        </form>
+
+        {% if banned %}
+        <div class="space-y-1 max-h-80 overflow-y-auto">
+            {% for player in banned %}
+            <div class="flex items-center justify-between py-2 px-3 rounded transition text-sm">
+                <div>
+                    <span style="color: var(--clr-text-primary);">{{ player.name }}</span>
+                    {% if player.reason %}
+                    <span class="text-xs ml-2" style="color: var(--clr-text-muted);">{{ player.reason }}</span>
+                    {% endif %}
+                </div>
+                <form action="/servers/{{ server.id }}/pardon" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <input type="hidden" name="name" value="{{ player.name }}">
+                    <button class="text-xs px-2 py-1 rounded transition" style="border: 1px solid var(--clr-success); color: var(--clr-success);">
+                        Pardon
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-xs mt-3" style="color: var(--clr-text-muted);">{{ banned | length }} player(s) banned</p>
+        {% else %}
+        <p class="text-sm" style="color: var(--clr-text-muted);">No players banned.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

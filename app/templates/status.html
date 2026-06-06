@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Status - GameServer Manager</title>
+    <link rel="stylesheet" href="/static/css/fonts.css">
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+    <style>
+        :root {
+            --clr-bg: #ffffff;
+            --clr-panel: #f8fafc;
+            --clr-input: #f1f5f9;
+            --clr-border: #e2e8f0;
+            --clr-text-primary: #0f172a;
+            --clr-text-secondary: #475569;
+            --clr-text-muted: #94a3b8;
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #4f46e5;
+            --clr-accent-subtle: rgba(99,102,241,.10);
+            --clr-success: #22c55e;
+            --clr-success-bg: rgba(34,197,94,.10);
+            --clr-warning: #eab308;
+            --clr-warning-bg: rgba(234,179,8,.10);
+            --clr-danger: #ef4444;
+            --clr-danger-bg: rgba(239,68,68,.10);
+            --clr-info: #3b82f6;
+            --clr-info-bg: rgba(59,130,246,.10);
+        }
+        html.dark {
+            --clr-bg: #0f0f23;
+            --clr-panel: #1a1a2e;
+            --clr-input: #252547;
+            --clr-border: #2e2e52;
+            --clr-text-primary: #e2e8f0;
+            --clr-text-secondary: #94a3b8;
+            --clr-text-muted: #64748b;
+            --clr-accent: #818cf8;
+            --clr-accent-hover: #6366f1;
+            --clr-accent-subtle: rgba(129,140,248,.10);
+            --clr-success: #4ade80;
+            --clr-success-bg: rgba(74,222,128,.10);
+            --clr-warning: #facc15;
+            --clr-warning-bg: rgba(250,204,21,.10);
+            --clr-danger: #f87171;
+            --clr-danger-bg: rgba(248,113,113,.10);
+            --clr-info: #60a5fa;
+            --clr-info-bg: rgba(96,165,250,.10);
+        }
+        body {
+            background: var(--clr-bg);
+            color: var(--clr-text-primary);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        .card {
+            background: var(--clr-panel);
+            border: 1px solid var(--clr-border);
+            border-radius: 0.75rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="max-w-4xl mx-auto px-6 py-12">
+        <h1 class="text-3xl font-bold text-center mb-2" style="color: var(--clr-accent);">Server Status</h1>
+        <p class="text-center text-sm mb-8" style="color: var(--clr-text-secondary);">Auto-refreshes every 15 seconds</p>
+
+        {% if servers %}
+        {% set online_servers = servers | selectattr('is_online') | list %}
+        {% set offline_servers = servers | rejectattr('is_online') | list %}
+
+        {% if online_servers %}
+        <h2 class="text-lg font-semibold mb-3" style="color: var(--clr-success);">Online ({{ online_servers | length }})</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8" id="online-servers">
+            {% for s in online_servers %}
+            <div class="card p-5" data-server="{{ s.name }}">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-lg">{{ s.name }}</h3>
+                    <span class="flex items-center gap-1.5 text-sm" style="color: var(--clr-success);">
+                        <span class="w-2 h-2 rounded-full animate-pulse" style="background: var(--clr-success);"></span> Online
+                    </span>
+                </div>
+                <div class="text-sm space-y-1" style="color: var(--clr-text-secondary);">
+                    <div class="flex justify-between">
+                        <span>Type</span>
+                        <span style="color: var(--clr-text-primary);">{{ s.server_type | replace("_", " ") | title }}</span>
+                    </div>
+                    {% if s.mc_version %}
+                    <div class="flex justify-between">
+                        <span>Version</span>
+                        <span style="color: var(--clr-text-primary);">{{ s.mc_version }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <span>Port</span>
+                        <span style="color: var(--clr-text-primary);">{{ s.port }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Players</span>
+                        <span style="color: var(--clr-text-primary);">{{ s.player_count if s.player_count is not none else "N/A" }}</span>
+                    </div>
+                    {% if s.uptime_seconds is not none %}
+                    <div class="flex justify-between">
+                        <span>Uptime</span>
+                        <span class="server-uptime" style="color: var(--clr-success);" data-seconds="{{ s.uptime_seconds }}">
+                            {{ '%dd %dh %dm' | format(s.uptime_seconds // 86400, (s.uptime_seconds % 86400) // 3600, (s.uptime_seconds % 3600) // 60) }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if offline_servers %}
+        <h2 class="text-lg font-semibold mb-3" style="color: var(--clr-text-muted);">Offline ({{ offline_servers | length }})</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="offline-servers">
+            {% for s in offline_servers %}
+            <div class="card p-5" data-server="{{ s.name }}">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-lg">{{ s.name }}</h3>
+                    <span class="flex items-center gap-1.5 text-sm" style="color: var(--clr-text-muted);">
+                        <span class="w-2 h-2 rounded-full" style="background: var(--clr-text-muted);"></span> Offline
+                    </span>
+                </div>
+                <div class="text-sm space-y-1" style="color: var(--clr-text-secondary);">
+                    <div class="flex justify-between">
+                        <span>Type</span>
+                        <span style="color: var(--clr-text-primary);">{{ s.server_type | replace("_", " ") | title }}</span>
+                    </div>
+                    {% if s.mc_version %}
+                    <div class="flex justify-between">
+                        <span>Version</span>
+                        <span style="color: var(--clr-text-primary);">{{ s.mc_version }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <span>Port</span>
+                        <span style="color: var(--clr-text-primary);">{{ s.port }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="text-center py-12" style="color: var(--clr-text-muted);">
+            <p>No servers configured.</p>
+        </div>
+        {% endif %}
+
+        <footer class="text-center text-sm py-8 mt-8" style="color: var(--clr-text-muted);">
+            Powered by GameServer Manager
+        </footer>
+    </div>
+
+    <script nonce="{{ request.state.csp_nonce }}">
+    setInterval(async () => {
+        try {
+            const resp = await fetch('/status/json');
+            if (!resp.ok) return;
+            const data = await resp.json();
+            // Simple page reload on data change for robustness
+            location.reload();
+        } catch(e) {}
+    }, 15000);
+    </script>
+</body>
+</html>

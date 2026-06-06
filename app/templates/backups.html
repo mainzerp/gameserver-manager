@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Backups - {{ server.name }}{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/{{ server.id }}" style="color: var(--clr-text-muted);" class="hover:underline">{{ server.name }}</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Backups</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Backups</h1>
+</div>
+
+<!-- Create Backup -->
+<div class="card p-6 mb-6">
+    <form action="/servers/{{ server.id }}/backups/create" method="post" class="space-y-4">
+        {{ csrf_field(request) }}
+        <div class="flex flex-wrap items-end gap-4">
+            <div class="flex-1" style="min-width:200px;">
+                <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Note (optional)</label>
+                <input type="text" name="note" placeholder="Backup description..."
+                    class="input-field">
+            </div>
+            <div>
+                <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Backup Type</label>
+                <select name="backup_type" class="input-field">
+                    <option value="full">Full</option>
+                    <option value="incremental">Incremental</option>
+                    <option value="config_only">Config Only</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm mb-1" style="color: var(--clr-text-secondary);">Retention (days)</label>
+                <input type="number" name="retention_days" value="0" min="0" max="365"
+                    class="input-field" style="width:100px;"
+                    title="0 = no expiration">
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="hidden" name="compressed" value="true">
+                <label class="flex items-center gap-2 text-sm" style="color: var(--clr-text-secondary);">
+                    <input type="checkbox" checked data-change-action="syncCheckboxValue"
+                        class="w-4 h-4 rounded" style="border-color: var(--clr-border); background: var(--clr-input); color: var(--clr-accent);">
+                    Compress
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                Create Backup
+            </button>
+        </div>
+        <div id="backup-estimate" class="text-xs" style="color: var(--clr-text-muted);"></div>
+    </form>
+</div>
+
+<!-- Backup List -->
+{% if backups %}
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="table-header" style="color: var(--clr-text-muted);">
+                <th class="px-4 py-3 text-left">File</th>
+                <th class="px-4 py-3 text-left">Type</th>
+                <th class="px-4 py-3 text-left">Size</th>
+                <th class="px-4 py-3 text-left">Files</th>
+                <th class="px-4 py-3 text-left">Note</th>
+                <th class="px-4 py-3 text-left">Created</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for backup in backups %}
+            <tr class="table-row" style="border-top: 1px solid var(--clr-border);">
+                <td class="px-4 py-3 font-mono text-xs" style="color: var(--clr-text-primary);">{{ backup.file_name }}</td>
+                <td class="px-4 py-3 text-xs">
+                    {% if backup.backup_type == 'incremental' %}
+                    <span class="badge badge-info">Incremental</span>
+                    {% elif backup.backup_type == 'config_only' %}
+                    <span class="badge badge-warning">Config</span>
+                    {% else %}
+                    <span class="badge badge-success">Full</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3" style="color: var(--clr-text-secondary);">
+                    {% if backup.size_bytes >= 1073741824 %}
+                        {{ "%.1f"|format(backup.size_bytes / 1073741824) }} GB
+                    {% elif backup.size_bytes >= 1048576 %}
+                        {{ "%.1f"|format(backup.size_bytes / 1048576) }} MB
+                    {% else %}
+                        {{ "%.1f"|format(backup.size_bytes / 1024) }} KB
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-xs" style="color: var(--clr-text-secondary);">{{ backup.file_count }}</td>
+                <td class="px-4 py-3" style="color: var(--clr-text-secondary);">{{ backup.note or '-' }}</td>
+                <td class="px-4 py-3" style="color: var(--clr-text-secondary);">{{ backup.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <form action="/servers/{{ server.id }}/backups/{{ backup.id }}/restore" method="post"
+                              data-confirm='Restore this backup? This will overwrite the current server files.'>
+                            {{ csrf_field(request) }}
+                            <button class="text-xs transition" style="color: var(--clr-warning);">Restore</button>
+                        </form>
+                        <form action="/servers/{{ server.id }}/backups/{{ backup.id }}/delete" method="post"
+                              data-confirm='Delete this backup?'>
+                            {{ csrf_field(request) }}
+                            <button class="text-xs transition" style="color: var(--clr-danger);">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% else %}
+<div class="card p-12 text-center">
+    <p style="color: var(--clr-text-muted);">No backups yet. Create your first backup above.</p>
+</div>
+{% endif %}
+
+<script nonce="{{ request.state.csp_nonce }}">
+(async function() {
+    try {
+        const resp = await fetch('/servers/{{ server.id }}/backups/estimate');
+        const data = await resp.json();
+        const el = document.getElementById('backup-estimate');
+        let sizeStr;
+        if (data.size_bytes >= 1073741824) sizeStr = (data.size_bytes / 1073741824).toFixed(1) + ' GB';
+        else if (data.size_bytes >= 1048576) sizeStr = (data.size_bytes / 1048576).toFixed(1) + ' MB';
+        else sizeStr = (data.size_bytes / 1024).toFixed(1) + ' KB';
+        el.textContent = 'Estimated full backup size: ' + sizeStr + ' (' + data.file_count + ' files)';
+    } catch(e) {}
+})();
+</script>
+{% endblock %}

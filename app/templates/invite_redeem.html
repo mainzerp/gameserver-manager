@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Accept Invite - GameServer Manager{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center" style="min-height: 50vh;">
+    <div class="card w-full max-w-md">
+        <div class="card-header">Server Invite</div>
+        <div class="card-body text-center">
+            <svg class="w-16 h-16 mx-auto mb-4" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <h2 class="text-xl font-semibold mb-2" style="color: var(--clr-text-primary);">You've been invited!</h2>
+            <p class="text-sm mb-6" style="color: var(--clr-text-secondary);">
+                Click the button below to accept the invite and gain access to the server.
+            </p>
+            <form action="/invite/{{ code }}" method="post">
+                {{ csrf_field(request) }}
+                <button type="submit" class="btn btn-primary w-full">Accept Invite</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

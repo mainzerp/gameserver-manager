@@ -1,0 +1,11 @@
+{
+  "name": "gameserver-manager",
+  "private": true,
+  "scripts": {
+    "css:build": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/tailwind.css --minify",
+    "css:watch": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4"
+  }
+}

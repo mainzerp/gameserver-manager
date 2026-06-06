@@ -1,0 +1,3023 @@
+{% extends "base.html" %}
+{% block title %}{{ server.name }} - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}<a href="/" style="color:var(--clr-text-secondary)">Dashboard</a> <span style="color:var(--clr-text-muted)">/</span> {{ server.name }}{% endblock %}
+
+{% block content %}
+{% set steam_snapshot = steam_operation_snapshot or {} %}
+{% set steam_snapshot_status = steam_snapshot.get('status', 'idle') %}
+{% set steam_snapshot_percent = steam_snapshot.get('percent', 0) %}
+{% set steam_active_update_start = steam_has_active_update_start %}
+<!-- Server Header -->
+<div class="mb-6">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold" style="color:var(--clr-text-primary);">{{ server.name }}</h1>
+            <p class="text-sm mt-1" style="color:var(--clr-text-secondary);">
+                {{ server.server_type.value | replace("_", " ") | title }}
+                {% if server.mc_version %} | {{ server.mc_version }}{% endif %}
+                {% if server.loader %} | {{ server.loader | title }}{% endif %}
+                | Port {{ server.port }}
+                {% if node %} | <span class="badge badge-neutral">{{ node.name }}</span>{% endif %}
+            </p>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+            {% if is_running %}
+            <span class="badge badge-success"><span class="status-dot status-dot-running"></span> Online</span>
+            {% elif server.status.value == 'starting' %}
+            <span class="badge badge-warning" style="animation:pulse 1.5s ease-in-out infinite;"><span class="status-dot status-dot-starting"></span> Starting...</span>
+            {% if not steam_active_update_start %}
+            <script nonce="{{ request.state.csp_nonce }}">window.serverDetailStartingReloadTimer = window.setTimeout(function(){location.reload();}, 5000);</script>
+            {% endif %}
+            {% elif server.status.value == 'crashed' %}
+            <span class="badge badge-danger"><span class="status-dot status-dot-crashed"></span> Crashed</span>
+            {% else %}
+            <span class="badge badge-neutral"><span class="status-dot status-dot-stopped"></span> Offline</span>
+            {% endif %}
+
+            {% if is_running %}
+            <form action="/servers/{{ server.id }}/restart" method="post" class="inline">
+                {{ csrf_field(request) }}
+                <button class="btn btn-secondary btn-sm">Restart</button>
+            </form>
+            <form action="/servers/{{ server.id }}/stop" method="post" class="inline">
+                {{ csrf_field(request) }}
+                <button class="btn btn-danger btn-sm">Stop</button>
+            </form>
+            {% else %}
+            <form action="/servers/{{ server.id }}/start" method="post" class="inline">
+                {{ csrf_field(request) }}
+                <button class="btn btn-primary btn-sm">Start</button>
+            </form>
+            {% endif %}
+
+            <button type="button" data-action="showCloneModal"
+                class="btn btn-secondary btn-sm">Clone</button>
+            <form action="/servers/{{ server.id }}/delete" method="post" class="inline"
+                  data-confirm='Really delete this server?'>
+                {{ csrf_field(request) }}
+                <button class="btn btn-danger btn-sm">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if server.server_type.value == 'steam' %}
+<div id="steam-operation-panel" class="mb-6{% if not steam_active_update_start %} hidden{% endif %} rounded-lg" data-seeded-active-update-start="{{ 'true' if steam_active_update_start else 'false' }}" style="background: var(--clr-bg-primary); border: 1px solid var(--clr-border);">
+    <div class="p-4 space-y-3">
+        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+                <p id="steam-operation-label" class="text-sm font-semibold" style="color: var(--clr-text-primary);">{% if steam_active_update_start %}Steam Update Before Start{% else %}SteamCMD{% endif %}</p>
+                <p id="steam-operation-message" class="text-xs" style="color: var(--clr-text-secondary);">{% if steam_active_update_start %}{{ steam_snapshot.get('message') or 'Steam operation in progress.' }}{% else %}No Steam operation is currently running.{% endif %}</p>
+            </div>
+            <span id="steam-operation-status" class="badge {% if steam_active_update_start and steam_snapshot_status == 'waiting_for_steam_guard' %}badge-warning{% elif steam_active_update_start and steam_snapshot_status == 'running' %}badge-info{% elif steam_active_update_start and steam_snapshot_status == 'queued' %}badge-neutral{% else %}badge-neutral{% endif %}">{% if steam_active_update_start and steam_snapshot_status == 'waiting_for_steam_guard' %}Steam Guard{% elif steam_active_update_start and steam_snapshot_status == 'running' %}Running{% elif steam_active_update_start and steam_snapshot_status == 'queued' %}Queued{% else %}Idle{% endif %}</span>
+        </div>
+        <div id="steam-operation-progress" class="{% if not steam_active_update_start %}hidden{% endif %}">
+            <div class="progress-bar">
+                <div id="steam-operation-progress-bar" class="progress-fill" style="width: {{ steam_snapshot_percent if steam_active_update_start else 0 }}%; background: var(--clr-accent);"></div>
+            </div>
+            <p id="steam-operation-progress-text" class="mt-2 text-xs" style="color: var(--clr-text-muted);">{% if steam_active_update_start %}{{ steam_snapshot_percent | round | int }}%{% else %}0%{% endif %}</p>
+        </div>
+        <form id="steam-guard-form" class="{% if not (steam_active_update_start and steam_snapshot_status == 'waiting_for_steam_guard') %}hidden {% endif %}flex flex-col gap-3 md:flex-row md:items-end">
+            <input type="hidden" id="steam-guard-operation-id" value="{{ steam_snapshot.get('operation_id') or '' }}">
+            <div class="flex-1">
+                <label for="steam-guard-code" class="block text-xs mb-1" style="color: var(--clr-text-secondary);">Steam Guard Code</label>
+                <input id="steam-guard-code" type="text" inputmode="numeric" autocomplete="one-time-code" class="input-field" placeholder="Enter the current Steam Guard code">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Submit Code</button>
+        </form>
+        <p id="steam-guard-feedback" class="{% if not (steam_active_update_start and steam_snapshot_status == 'waiting_for_steam_guard') %}hidden {% endif %}text-xs" style="color: {% if steam_active_update_start and steam_snapshot_status == 'waiting_for_steam_guard' %}var(--clr-warning){% else %}var(--clr-danger){% endif %};">{% if steam_active_update_start and steam_snapshot_status == 'waiting_for_steam_guard' %}{{ steam_snapshot.get('message') or 'Steam Guard input is required to continue.' }}{% endif %}</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tab Navigation -->
+<div class="tab-nav mb-6" id="server-tabs">
+    <button data-tab="console" id="tab-console" class="tab-btn">Console</button>
+    <button data-tab="overview" id="tab-overview" class="tab-btn tab-btn-active">Overview</button>
+    <button data-tab="settings" id="tab-settings" class="tab-btn">Settings</button>
+    {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
+    <button data-tab="config" id="tab-config" class="tab-btn">Configuration</button>
+    {% endif %}
+    <button data-tab="scheduler" id="tab-scheduler" class="tab-btn">Scheduler</button>
+    {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
+    <button data-tab="mods" id="tab-mods" class="tab-btn">Mods ({{ mods | length }})</button>
+    {% endif %}
+    {% if server.server_type.value == 'steam' %}
+    <button data-tab="workshop" id="tab-workshop" class="tab-btn">Workshop{% if workshop_items %} ({{ workshop_items | length }}){% endif %}</button>
+    {% endif %}
+    <button data-tab="backups" id="tab-backups" class="tab-btn">Backups</button>
+    <button data-tab="files" id="tab-files" class="tab-btn">Files</button>
+</div>
+
+<!-- ============================== -->
+<!-- TAB: Console                   -->
+<!-- ============================== -->
+<div id="panel-console" class="tab-panel hidden">
+    <div class="card mb-6">
+        <div class="card-header flex items-center justify-between">
+            <span>Console</span>
+            <div class="flex items-center gap-3">
+                <button id="load-history-btn" class="btn btn-secondary btn-sm">Load History</button>
+                <button type="button" data-action="clearConsole" class="btn btn-secondary btn-sm">Clear</button>
+                <a href="/servers/{{ server.id }}/logs/download" class="btn btn-secondary btn-sm">Download Log</a>
+                <span class="text-xs" id="ws-status" style="color:var(--clr-text-muted);">
+                    {% if is_running %}Connecting...{% else %}Server offline{% endif %}
+                </span>
+            </div>
+        </div>
+        <!-- Log Search -->
+        <div class="px-5 py-3" style="border-bottom:1px solid var(--clr-border);">
+            <form id="log-search-form" class="flex gap-2">
+                <input type="text" id="log-search-input" placeholder="Search logs..." class="input-field" style="width:auto;flex:1;">
+                <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                <button type="button" id="clear-search-btn" class="btn btn-secondary btn-sm hidden">Clear</button>
+            </form>
+            <div id="search-results" class="hidden mt-2 max-h-48 overflow-y-auto text-sm font-mono rounded p-2" style="background:var(--console-bg);color:var(--clr-warning);"></div>
+        </div>
+        <!-- Console Log Level Filters -->
+        <div class="px-5 py-2 flex flex-wrap items-center gap-2" style="border-bottom:1px solid var(--clr-border);">
+            <span class="text-xs font-medium" style="color:var(--clr-text-muted);">Filter:</span>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="info" id="toggle-info" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #22c55e;">INFO</button>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="warn" id="toggle-warn" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #eab308;">WARN</button>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="error" id="toggle-error" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #ef4444;">ERROR</button>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="debug" id="toggle-debug" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #6b7280;">DEBUG</button>
+            <div class="ml-auto">
+                <button type="button" data-action="toggleAutoScroll" id="toggle-scroll" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Auto-scroll: ON</button>
+            </div>
+        </div>
+        <style>
+            .console-line[data-level="error"] { border-left: 3px solid #ef4444; padding-left: 8px; }
+            .console-line[data-level="warn"] { border-left: 3px solid #eab308; padding-left: 8px; }
+            .console-line[data-level="debug"] { border-left: 3px solid #6b7280; padding-left: 8px; opacity: 0.7; }
+            .console-line[data-level="info"] { border-left: 3px solid transparent; padding-left: 11px; }
+        </style>
+        <div class="console-output p-4" id="console-output">
+            {% for line in logs %}
+            <div>{{ line }}</div>
+            {% endfor %}
+        </div>
+        <!-- Saved Command Shortcuts -->
+        <div id="saved-commands-bar" class="px-5 py-2 flex flex-wrap gap-1 hidden" style="border-top:1px solid var(--clr-border);">
+        </div>
+        <!-- Tab Completion Popup -->
+        <div id="tab-complete-popup" class="hidden absolute z-50 rounded-lg shadow-lg p-2 text-xs max-h-48 overflow-y-auto" style="background:var(--clr-panel);border:1px solid var(--clr-border);"></div>
+        <form id="console-form" class="flex" style="border-top:1px solid var(--clr-border);position:relative;">
+            <span class="px-3 py-3" style="color:var(--clr-text-muted);">&gt;</span>
+            <input type="text" id="console-input" placeholder="Enter command..."
+                class="flex-1 py-3 pr-4 outline-none text-sm" style="background:transparent;color:var(--clr-text-primary);"
+                {% if not is_running %}disabled{% endif %}>
+            <button type="submit" class="px-4 py-3 text-sm font-medium" style="color:var(--clr-accent);">
+                Send
+            </button>
+        </form>
+    </div>
+
+    <!-- RCON Console -->
+    {% if server.rcon_enabled %}
+    <div class="card mb-6">
+        <div class="card-header">RCON Console</div>
+        <div class="console-output p-4" id="rcon-output" style="min-height:100px;max-height:200px;overflow-y:auto;color:var(--clr-warning);"></div>
+        <form id="rcon-form" class="flex" style="border-top:1px solid var(--clr-border);">
+            <span class="px-3 py-3" style="color:var(--clr-text-muted);">RCON&gt;</span>
+            <input type="text" id="rcon-input" placeholder="Enter RCON command..."
+                class="flex-1 py-3 pr-4 outline-none text-sm" style="background:transparent;color:var(--clr-text-primary);">
+            <button type="submit" class="px-4 py-3 text-sm font-medium" style="color:var(--clr-warning);">Send</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================== -->
+<!-- TAB: Overview                  -->
+<!-- ============================== -->
+<div id="panel-overview" class="tab-panel">
+    <!-- Quick Info Bar -->
+    <div class="card mb-6">
+        <div class="card-body py-3">
+            <div class="flex flex-wrap items-center gap-6 text-sm">
+                <div class="flex items-center gap-2">
+                    <span style="color: var(--clr-text-muted);">Type:</span>
+                    <span style="color: var(--clr-text-primary);" class="font-medium">{{ server.server_type.value | replace("_", " ") | title }}</span>
+                </div>
+                {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] and server.mc_version %}
+                <div class="flex items-center gap-2">
+                    <span style="color: var(--clr-text-muted);">Version:</span>
+                    <span style="color: var(--clr-text-primary);" class="font-medium">{{ server.mc_version }}{% if server.loader %} ({{ server.loader | title }}){% endif %}</span>
+                </div>
+                {% endif %}
+                {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span style="color: var(--clr-text-muted);">Max Compatible:</span>
+                        {% if server.max_compatible_mc_version %}
+                        <span class="font-medium" style="color: var(--clr-success);">{{ server.max_compatible_mc_version }}</span>
+                        {% else %}
+                        <span class="text-xs" style="color:var(--clr-text-muted);">Not checked</span>
+                        {% endif %}
+                        <form action="/servers/{{ server.id }}/mods/refresh-max-version" method="post" class="inline">
+                            {{ csrf_field(request) }}
+                            <button class="text-xs" style="color:var(--clr-primary); background:none; border:none; cursor:pointer; padding:0;" title="Refresh now">&#x21bb;</button>
+                        </form>
+                    </div>
+                    {% if server.max_compatible_checked_at %}
+                    <p class="text-xs" style="color:var(--clr-text-muted);">Checked: {{ server.max_compatible_checked_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                <div class="flex items-center gap-2">
+                    <span style="color: var(--clr-text-muted);">Address:</span>
+                    <code id="server-address" style="color: var(--clr-text-primary);" class="font-mono text-xs">localhost:{{ server.port }}</code>
+                    <button type="button" id="copy-address-btn" class="text-xs font-medium" style="color: var(--clr-accent);">Copy</button>
+                    <button type="button" data-action="checkPort" class="text-xs font-medium" style="color: var(--clr-accent);">Test Port</button>
+                    <span id="port-result" class="text-xs font-medium"></span>
+                </div>
+                {% if uptime_seconds is not none %}
+                <div class="flex items-center gap-2">
+                    <span style="color: var(--clr-text-muted);">Uptime:</span>
+                    <span id="uptime-display" style="color: var(--clr-success);" class="font-medium">
+                        {% set hours = uptime_seconds // 3600 %}
+                        {% set minutes = (uptime_seconds % 3600) // 60 %}
+                        {{ hours }}h {{ minutes }}m
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Resource Monitoring -->
+    <div class="card mb-6" id="resource-panel">
+        <div class="card-header">Resource Monitoring</div>
+        <div class="card-body">
+            <div id="resource-running" {% if not is_running %}class="hidden"{% endif %}>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span style="color:var(--clr-text-secondary);">Server CPU</span>
+                            <span id="srv-cpu-text" style="color:var(--clr-text-primary);">--</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="srv-cpu-bar" style="width:0%;background:var(--clr-accent);"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span style="color:var(--clr-text-secondary);">Server RAM</span>
+                            <span id="srv-ram-text" style="color:var(--clr-text-primary);">--</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="srv-ram-bar" style="width:0%;background:var(--clr-success);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="resource-offline" {% if is_running %}class="hidden"{% endif %}>
+                <p class="text-sm" style="color:var(--clr-text-muted);">Server offline -- resource monitoring unavailable.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance History -->
+    <div class="card mb-6">
+        <div class="card-header flex items-center justify-between">
+            <span>Performance History</span>
+            <div class="flex gap-2" id="period-buttons">
+                <button class="period-btn btn btn-primary btn-sm" data-period="1h">1h</button>
+                <button class="period-btn btn btn-secondary btn-sm" data-period="6h">6h</button>
+                <button class="period-btn btn btn-secondary btn-sm" data-period="24h">24h</button>
+                <button class="period-btn btn btn-secondary btn-sm" data-period="7d">7d</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <canvas id="perf-chart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Online Players -->
+    {% if is_running %}
+    <div class="card mb-6">
+        <div class="card-header flex items-center justify-between">
+            <span>Online Players</span>
+            <div class="flex items-center gap-2">
+                <span class="text-sm" id="player-count" style="color:var(--clr-text-secondary);">--</span>
+                <button type="button" data-action="refreshPlayers" class="btn btn-secondary btn-sm">Refresh</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="player-list" class="text-sm" style="color:var(--clr-text-secondary);">Loading...</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Player Management Link (Minecraft only) -->
+    {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
+    <button type="button" data-tab="config"
+        class="inline-flex items-center gap-2 text-sm" style="color:var(--clr-accent);background:none;border:none;cursor:pointer;padding:0;">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        Manage Whitelist / Bans
+    </button>
+    {% endif %}
+
+    <!-- Recent Events -->
+    {% if recent_events %}
+    <div class="card mb-6 mt-6">
+        <div class="card-header">Recent Events</div>
+        <div class="card-body">
+            <div class="space-y-2 text-sm">
+                {% for event in recent_events %}
+                <div class="flex items-center justify-between py-1" {% if not loop.last %}style="border-bottom: 1px solid var(--clr-border);"{% endif %}>
+                    <span style="color: var(--clr-text-primary);">{{ event.action }}</span>
+                    <span class="text-xs font-mono" style="color: var(--clr-text-muted);">{{ event.timestamp.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Steam Information -->
+    {% if server.server_type.value == 'steam' %}
+    <div class="card mb-6 mt-6">
+        <div class="card-header flex items-center justify-between">
+            <span>Steam Information</span>
+            <div class="flex gap-2">
+                {% if not is_running %}
+                <form action="/servers/{{ server.id }}/steam/update" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <button class="btn btn-primary btn-sm">Update Server</button>
+                </form>
+                <form action="/servers/{{ server.id }}/steam/validate" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <button class="btn btn-secondary btn-sm">Validate Files</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Steam App ID</span>
+                    <span style="color:var(--clr-text-primary);" class="font-mono">{{ server.steam_app_id or 'N/A' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Branch</span>
+                    <span style="color:var(--clr-text-primary);">{{ server.steam_branch or 'public' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Build ID</span>
+                    <span style="color:var(--clr-text-primary);" class="font-mono">{{ server.steam_build_id or 'Unknown' }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Login</span>
+                    <span style="color:var(--clr-text-primary);">{{ 'Anonymous' if server.steam_login_anonymous else 'Authenticated' }}</span>
+                </div>
+                {% if not server.steam_login_anonymous %}
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Steam Account</span>
+                    <span style="color:var(--clr-text-primary);">
+                        {% set current_account = steam_accounts | selectattr('id', 'equalto', server.steam_account_id) | first %}
+                        {{ current_account.display_name if current_account else 'Missing account' }}
+                    </span>
+                </div>
+                {% endif %}
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Update on Start</span>
+                    <span style="color:var(--clr-text-primary);">{{ 'Yes' if server.steam_update_on_start else 'No' }}</span>
+                </div>
+                {% if server.steam_app_id == '4020' or server.has_steam_gslt %}
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">GMod GSLT</span>
+                    <span style="color:var(--clr-text-primary);">{{ 'Configured' if server.has_steam_gslt else 'Not configured' }}</span>
+                </div>
+                {% endif %}
+                {% if server.steam_last_update %}
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Last Updated</span>
+                    <span style="color:var(--clr-text-primary);">{{ server.steam_last_update.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+                {% endif %}
+
+                <form action="/servers/{{ server.id }}/steam/settings" method="post" class="mt-4 space-y-3">
+                    {{ csrf_field(request) }}
+                    <div>
+                        <label class="block text-xs mb-1" style="color:var(--clr-text-secondary);" for="steam_app_id_edit">Steam App ID</label>
+                        <select id="steam_app_id_edit" name="steam_app_id" class="input-field">
+                            <option value="">Custom...</option>
+                            {% for key, app in steam_apps.items() %}
+                            <option value="{{ app.app_id }}" {% if server.steam_app_id == app.app_id %}selected{% endif %}>{{ app.name }} ({{ app.app_id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-secondary);" for="steam_branch_edit">Branch</label>
+                            <input id="steam_branch_edit" name="steam_branch" type="text" value="{{ server.steam_branch or 'public' }}" class="input-field">
+                        </div>
+                        <div>
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-secondary);" for="steam_account_id_edit">Steam Account</label>
+                            <select id="steam_account_id_edit" name="steam_account_id" class="input-field">
+                                <option value="">-- Select Steam Account --</option>
+                                {% for account in steam_accounts %}
+                                <option value="{{ account.id }}" {% if server.steam_account_id == account.id %}selected{% endif %}>{{ account.display_name }} ({{ account.username }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-secondary);" for="steam_gslt_edit">GMod GSLT</label>
+                            <input id="steam_gslt_edit" name="steam_gslt" type="password" value="" autocomplete="new-password" class="input-field" placeholder="{% if server.has_steam_gslt %}Leave blank to keep current token{% else %}Paste a Game Server Login Token{% endif %}">
+                            <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Stored encrypted and injected only at launch time.</p>
+                        </div>
+                        <div class="flex items-end">
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="hidden" name="clear_steam_gslt" value="false">
+                                <input type="checkbox" name="clear_steam_gslt" value="true" class="w-4 h-4 rounded">
+                                Clear saved GMod GSLT
+                            </label>
+                        </div>
+                    </div>
+                    {% if server.steam_app_id == '4020' %}
+                    <p class="text-xs" style="color:var(--clr-text-muted);">Used only for Garry's Mod dedicated servers. The panel injects it as <span class="font-mono">+sv_setsteamaccount</span> at launch time. Create the token against base game app id <span class="font-mono">4000</span>; the dedicated server install app id remains <span class="font-mono">4020</span>.</p>
+                    {% endif %}
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="hidden" name="steam_login_anonymous" value="false">
+                        <input type="checkbox" name="steam_login_anonymous" value="true" {% if server.steam_login_anonymous %}checked{% endif %} class="w-4 h-4 rounded">
+                        Anonymous Login
+                    </label>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="hidden" name="steam_update_on_start" value="false">
+                        <input type="checkbox" name="steam_update_on_start" value="true" {% if server.steam_update_on_start %}checked{% endif %} class="w-4 h-4 rounded">
+                        Update on Start
+                    </label>
+                    <div>
+                        <button class="btn btn-secondary btn-sm">Save Steam Settings</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================== -->
+<!-- TAB: Settings                  -->
+<!-- ============================== -->
+<div id="panel-settings" class="tab-panel hidden">
+    <!-- Server Details -->
+    <div class="card mb-6">
+        <div class="card-header">Server Details</div>
+        <div class="card-body">
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Path</span>
+                    <span class="font-mono text-xs" style="color:var(--clr-text-primary);">{{ server.path }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Executable</span>
+                    <span style="color:var(--clr-text-primary);">{{ server.executable }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">RAM</span>
+                    <span style="color:var(--clr-text-primary);">{{ server.min_memory }}MB - {{ server.max_memory }}MB</span>
+                </div>
+                {% if server.server_type.value == 'steam' %}
+                <form action="/servers/{{ server.id }}/memory" method="post" class="space-y-3" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    {{ csrf_field(request) }}
+                    <div>
+                        <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Steam RAM (MB)</label>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="block text-xs mb-1" style="color:var(--clr-text-muted);">Min</label>
+                                <input type="number" name="min_memory" class="input-field w-full"
+                                    value="{{ server.min_memory or 1024 }}" min="256" max="65536" step="256">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-xs mb-1" style="color:var(--clr-text-muted);">Max</label>
+                                <input type="number" name="max_memory" class="input-field w-full"
+                                    value="{{ server.max_memory or 2048 }}" min="512" max="65536" step="256">
+                            </div>
+                        </div>
+                        <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Updates the stored RAM values shown for this SteamCMD server.</p>
+                    </div>
+                    <div class="flex justify-end">
+                        <button class="btn btn-primary btn-sm">Save RAM</button>
+                    </div>
+                </form>
+                {% endif %}
+                {% if server.server_type.value == 'minecraft_java' %}
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Java</span>
+                    <span style="color:var(--clr-text-primary);">{{ server.java_path }}</span>
+                </div>
+                {% if required_java_version and not java_compatible %}
+                <div class="rounded-lg p-3 mt-2" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+                    <p class="text-xs mb-2" style="color: var(--clr-warning);">
+                        MC {{ server.mc_version }} requires Java {{ required_java_version }}+. No compatible Java found.
+                    </p>
+                    <form method="post" action="/servers/{{ server.id }}/install-java">
+                        {{ csrf_field(request) }}
+                        <button type="submit" class="btn btn-sm" style="background: var(--clr-warning); color: #fff;">
+                            Download Java {{ required_java_version }}
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+                {% if managed_javas %}
+                <div class="mt-2">
+                    <span class="text-xs" style="color: var(--clr-text-muted);">Managed Java installs:</span>
+                    {% for j in managed_javas %}
+                    <span class="text-xs block" style="color: var(--clr-text-secondary);">Java {{ j.version }}: {{ j.path }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endif %}
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Created</span>
+                    <span style="color:var(--clr-text-primary);">{{ server.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export / Import Config -->
+    <div class="card mb-6">
+        <div class="card-header">Config Export / Import</div>
+        <div class="card-body">
+            <div class="flex items-center gap-4">
+                <a href="/servers/{{ server.id }}/export-config" class="btn btn-secondary btn-sm">Export Config (JSON)</a>
+                <span class="text-xs" style="color:var(--clr-text-muted);">Download server settings as a JSON file that can be re-imported.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invite Links -->
+    <div class="card mb-6">
+        <div class="card-header">Invite Links</div>
+        <div class="card-body">
+            <div class="flex items-center gap-3 mb-4">
+                <select id="invite-role" class="input-field" style="width:auto;">
+                    <option value="viewer">Viewer</option>
+                    <option value="operator">Operator</option>
+                    <option value="manage">Manager</option>
+                </select>
+                <input type="number" id="invite-max-uses" placeholder="Max uses (blank=unlimited)" class="input-field" style="width:180px;" min="1">
+                <input type="number" id="invite-hours" placeholder="Hours valid (blank=never)" class="input-field" style="width:180px;" min="1" max="8760">
+                <button type="button" data-action="generateInvite" class="btn btn-primary btn-sm">Generate Link</button>
+            </div>
+            <div id="invite-result" class="hidden mb-4 p-3 rounded-lg" style="background:var(--clr-success-bg);border:1px solid var(--clr-success);">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="invite-url-display" readonly class="input-field flex-1 font-mono text-xs">
+                    <button type="button" data-action="copyInviteUrl" class="btn btn-secondary btn-sm">Copy</button>
+                </div>
+            </div>
+            <div id="invite-list" class="text-sm" style="color:var(--clr-text-secondary);">Loading invites...</div>
+        </div>
+    </div>
+
+    <!-- Auto-Start / Auto-Update -->
+    <div class="card mb-6">
+        <div class="card-header">Server Options</div>
+        <div class="card-body space-y-4">
+            {% set is_minecraft_server = server.server_type.value.startswith('minecraft') %}
+            {% set is_steam_server = server.server_type.value == 'steam' %}
+            <!-- Auto-Start -->
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-sm font-medium" style="color:var(--clr-text-primary);">Auto-Start</span>
+                    <p class="text-xs" style="color:var(--clr-text-muted);">Start this server when the panel starts</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="badge {% if server.auto_start %}badge-success{% else %}badge-neutral{% endif %}">
+                        {{ "Enabled" if server.auto_start else "Disabled" }}
+                    </span>
+                    <form action="/servers/{{ server.id }}/auto-start" method="post" class="inline">
+                        {{ csrf_field(request) }}
+                        <button class="btn btn-sm {% if server.auto_start %}btn-danger{% else %}btn-primary{% endif %}">
+                            {{ "Disable" if server.auto_start else "Enable" }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            {% if is_minecraft_server %}
+            <!-- Auto-Update Mods -->
+            <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                <div>
+                    <span class="text-sm font-medium" style="color:var(--clr-text-primary);">Auto-Update Mods</span>
+                    <p class="text-xs" style="color:var(--clr-text-muted);">Automatically update mods when updates are available</p>
+                </div>
+                <span class="badge {% if server.auto_update_mods %}badge-success{% else %}badge-neutral{% endif %}">
+                    {{ "Yes" if server.auto_update_mods else "No" }}
+                </span>
+            </div>
+            {% endif %}
+
+            <!-- Auto-Update Server -->
+            <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                <div>
+                    <span class="text-sm font-medium" style="color:var(--clr-text-primary);">{% if is_steam_server %}Auto-Update Steam Server{% else %}Auto-Update Server{% endif %}</span>
+                    <p class="text-xs" style="color:var(--clr-text-muted);">{% if is_steam_server %}Automatically check for and apply SteamCMD server updates{% else %}Automatically update the server JAR{% endif %}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="badge {% if server.auto_update_server %}badge-success{% else %}badge-neutral{% endif %}">
+                        {{ "Enabled" if server.auto_update_server else "Disabled" }}
+                    </span>
+                    <form action="/servers/{{ server.id }}/auto-update" method="post" class="inline">
+                        {{ csrf_field(request) }}
+                        <button class="btn btn-sm {% if server.auto_update_server %}btn-danger{% else %}btn-primary{% endif %}">
+                            {{ "Disable" if server.auto_update_server else "Enable" }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Auto-Restart on Crash -->
+            <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                <div>
+                    <span class="text-sm font-medium" style="color:var(--clr-text-primary);">Auto-Restart on Crash</span>
+                    <p class="text-xs" style="color:var(--clr-text-muted);">Automatically restart this server if it crashes</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="badge {% if server.auto_restart_on_crash %}badge-success{% else %}badge-neutral{% endif %}">
+                        {{ "Enabled" if server.auto_restart_on_crash else "Disabled" }}
+                    </span>
+                    <form action="/servers/{{ server.id }}/auto-restart-crash" method="post" class="inline">
+                        {{ csrf_field(request) }}
+                        <button class="btn btn-sm {% if server.auto_restart_on_crash %}btn-danger{% else %}btn-primary{% endif %}">
+                            {{ "Disable" if server.auto_restart_on_crash else "Enable" }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Server Version / Update Check -->
+            <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                <div>
+                    <span class="text-sm font-medium" style="color:var(--clr-text-primary);">{% if is_steam_server %}Steam Build{% else %}Server Version{% endif %}</span>
+                    <p class="text-xs" style="color:var(--clr-text-muted);">{% if is_steam_server %}{{ server.latest_known_version or server.steam_build_id or 'unknown' }}{% else %}{{ server.latest_known_version or server.mc_version or 'unknown' }}{% endif %}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="check-update-btn" class="btn btn-secondary btn-sm" data-action="checkServerUpdate">Check Updates</button>
+                    <span id="update-check-result" class="text-xs"></span>
+                </div>
+            </div>
+
+            {% if is_steam_server and server.latest_known_version and server.latest_known_version != (server.steam_build_id or '') %}
+            <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                <div>
+                    <span class="text-sm font-medium" style="color:var(--clr-warning);">Steam Update Available</span>
+                    <p class="text-xs" style="color:var(--clr-warning);">Build {{ server.latest_known_version }}</p>
+                </div>
+                <form action="/servers/{{ server.id }}/update" method="post"
+                      data-confirm='Update the SteamCMD server? The server will be stopped, backed up, and restarted.'>
+                    {{ csrf_field(request) }}
+                    <button class="btn btn-sm" style="background:var(--clr-warning);color:#fff;">Update Now</button>
+                </form>
+            </div>
+            {% elif server.latest_known_version and server.latest_known_version != (server.mc_version or '') %}
+            <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                <div>
+                    <span class="text-sm font-medium" style="color:var(--clr-warning);">Update Available</span>
+                    <p class="text-xs" style="color:var(--clr-warning);">{{ server.latest_known_version }}</p>
+                </div>
+                <form action="/servers/{{ server.id }}/update" method="post"
+                      data-confirm='Update the server JAR? The server will be stopped, backed up, and restarted.'>
+                    {{ csrf_field(request) }}
+                    <button class="btn btn-sm" style="background:var(--clr-warning);color:#fff;">Update Now</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Crash Restart Settings -->
+    {% if server.auto_restart_on_crash %}
+    <div class="card mb-6">
+        <div class="card-header">Crash Restart Settings</div>
+        <div class="card-body">
+            <form action="/servers/{{ server.id }}/crash-restart-settings" method="post" class="space-y-4">
+                {{ csrf_field(request) }}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-sm font-medium" style="color:var(--clr-text-primary);">Max Restart Attempts</span>
+                        <p class="text-xs" style="color:var(--clr-text-muted);">Maximum consecutive crash restarts before giving up (1-20)</p>
+                    </div>
+                    <input type="number" name="max_crash_restarts" value="{{ server.max_crash_restarts }}" min="1" max="20"
+                        class="input-field" style="width:80px;">
+                </div>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <div>
+                        <span class="text-sm font-medium" style="color:var(--clr-text-primary);">Restart Delay (seconds)</span>
+                        <p class="text-xs" style="color:var(--clr-text-muted);">Seconds to wait before attempting a restart (5-300)</p>
+                    </div>
+                    <input type="number" name="crash_restart_delay" value="{{ server.crash_restart_delay }}" min="5" max="300"
+                        class="input-field" style="width:80px;">
+                </div>
+                <div class="flex items-center justify-between" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <div>
+                        <span class="text-sm font-medium" style="color:var(--clr-text-primary);">Stability Window (seconds)</span>
+                        <p class="text-xs" style="color:var(--clr-text-muted);">Reset crash counter after this many seconds of stable uptime (60-3600)</p>
+                    </div>
+                    <input type="number" name="crash_stability_window" value="{{ server.crash_stability_window }}" min="60" max="3600"
+                        class="input-field" style="width:80px;">
+                </div>
+                <div class="flex justify-end" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <button class="btn btn-primary btn-sm">Save Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Startup Parameters (A3 JVM Flags + A9 Ready Pattern) -->
+    {% if server.server_type.value.startswith("minecraft") %}
+    <div class="card mb-6">
+        <div class="card-header">Startup Parameters</div>
+        <div class="card-body">
+            <form action="/servers/{{ server.id }}/jvm-flags" method="post" class="space-y-4">
+                {{ csrf_field(request) }}
+                {% if server.server_type.value == 'minecraft_java' %}
+                <div>
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">MC Version</label>
+                    <input type="text" name="mc_version" class="input-field font-mono text-xs w-full"
+                        value="{{ server.mc_version or '' }}"
+                        placeholder="e.g. 1.20.4">
+                </div>
+                <div style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Mod Loader</label>
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-muted);">Loader</label>
+                            <select name="loader" class="input-field w-full">
+                                <option value="" {% if not server.loader %}selected{% endif %}>None / Vanilla</option>
+                                <option value="fabric" {% if server.loader == 'fabric' %}selected{% endif %}>Fabric</option>
+                                <option value="paper" {% if server.loader == 'paper' %}selected{% endif %}>Paper</option>
+                                <option value="forge" {% if server.loader == 'forge' %}selected{% endif %}>Forge</option>
+                                <option value="neoforge" {% if server.loader == 'neoforge' %}selected{% endif %}>NeoForge</option>
+                                <option value="quilt" {% if server.loader == 'quilt' %}selected{% endif %}>Quilt</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-muted);">Loader Version</label>
+                            <input type="text" name="loader_version" class="input-field w-full font-mono text-xs"
+                                value="{{ server.loader_version or '' }}"
+                                placeholder="e.g. 0.16.10">
+                        </div>
+                    </div>
+                </div>
+                <div style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Executable (JAR filename)</label>
+                    <input type="text" name="executable" class="input-field font-mono text-xs w-full"
+                        value="{{ server.executable or 'server.jar' }}"
+                        placeholder="server.jar">
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">The JAR file to launch. Must exist in the server directory.</p>
+                </div>
+                <div style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">RAM (MB)</label>
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-muted);">Min (-Xms)</label>
+                            <input type="number" name="min_memory" class="input-field w-full"
+                                value="{{ server.min_memory or 1024 }}" min="256" max="65536" step="256">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-muted);">Max (-Xmx)</label>
+                            <input type="number" name="max_memory" class="input-field w-full"
+                                value="{{ server.max_memory or 2048 }}" min="512" max="65536" step="256">
+                        </div>
+                    </div>
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Restart the server for RAM changes to take effect.</p>
+                </div>
+                {% endif %}
+                <div style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">JVM Flags (one per line)</label>
+                    <textarea name="jvm_flags" rows="6" class="input-field font-mono text-xs w-full" id="jvm-flags-input"
+                        placeholder="-XX:+UseG1GC&#10;-XX:+ParallelRefProcEnabled&#10;-XX:MaxGCPauseMillis=200">{{ server.jvm_flags or '' }}</textarea>
+                    <div class="flex gap-2 mt-2">
+                        <button type="button" class="btn btn-secondary btn-sm" data-click-action="setAikarFlags" data-click-arg="4">Aikar's Flags (4G)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-click-action="setAikarFlags" data-click-arg="8">Aikar's Flags (8G+)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-action="clearJvmFlags">Clear</button>
+                    </div>
+                </div>
+                <div style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Server Arguments (one per line)</label>
+                    <textarea name="server_args" rows="3" class="input-field font-mono text-xs w-full" id="server-args-input"
+                        placeholder="nogui">{{ server.server_args or '' }}</textarea>
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Arguments appended after the JAR file. If empty, "nogui" is used by default.</p>
+                </div>
+                <div style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Ready Log Pattern</label>
+                    <input type="text" name="ready_log_pattern" class="input-field font-mono text-xs w-full"
+                        value="{{ server.ready_log_pattern or '' }}"
+                        placeholder='Done \(\d+\.\d+s\)! For help'>
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Regex pattern matched against server output to detect when the server is ready. Leave empty for default.</p>
+                </div>
+                <div style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Command Preview</label>
+                    <code id="cmd-preview" class="block p-3 rounded text-xs font-mono overflow-x-auto" style="background:var(--clr-bg-primary);color:var(--clr-text-secondary);border:1px solid var(--clr-border);white-space:pre-wrap;word-break:break-all;"></code>
+                </div>
+                <div class="flex justify-end" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <button class="btn btn-primary btn-sm">Save Startup Parameters</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Backup Retention -->
+    <div class="card mb-6">
+        <div class="card-header">Backup Retention</div>
+        <div class="card-body">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-sm" style="color:var(--clr-text-primary);">Maximum backups to keep: {{ server.max_backups if server.max_backups is not none else 10 }}</span>
+                </div>
+                <form action="/servers/{{ server.id }}/max-backups" method="post" class="inline flex items-center gap-2">
+                    {{ csrf_field(request) }}
+                    <input type="number" name="max_backups" value="{{ server.max_backups if server.max_backups is not none else 10 }}" min="1" max="100"
+                        class="input-field" style="width:80px;">
+                    <button class="btn btn-primary btn-sm">Set</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backup Exclusions -->
+    <div class="card mb-6">
+        <div class="card-header">Backup Exclusions</div>
+        <div class="card-body">
+            <form action="/servers/{{ server.id }}/backup-settings" method="post" class="space-y-4">
+                {{ csrf_field(request) }}
+                <div>
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Exclude Patterns (one per line, glob syntax)</label>
+                    <textarea name="backup_exclude_patterns" rows="4" class="input-field font-mono text-xs w-full"
+                        placeholder="*.log&#10;cache/*&#10;*.tmp">{{ backup_exclude_display }}</textarea>
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Files matching these patterns will be excluded from backups. Uses glob syntax (e.g. *.log, cache/*).</p>
+                </div>
+                <div class="flex justify-end">
+                    <button class="btn btn-primary btn-sm">Save Exclusions</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Per-Server Notifications -->
+    <div class="card mb-6">
+        <div class="card-header">Notifications</div>
+        <div class="card-body">
+            <form action="/servers/{{ server.id }}/notifications" method="post" class="space-y-4">
+                {{ csrf_field(request) }}
+                <div>
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Per-Server Webhook URL (optional)</label>
+                    <input type="url" name="webhook_url" class="input-field w-full"
+                        value="{{ server.notification_webhook_url or '' }}"
+                        placeholder="https://discord.com/api/webhooks/...">
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Override the global webhook for this server's notifications.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="notif_muted_{{ server.id }}" name="muted" value="true"
+                        {% if server.notifications_muted %}checked{% endif %}
+                        class="w-4 h-4 rounded" style="border-color:var(--clr-border);background:var(--clr-input);color:var(--clr-accent);">
+                    <label for="notif_muted_{{ server.id }}" class="text-sm">Mute all notifications for this server</label>
+                </div>
+                <div>
+                    <label class="block text-sm mb-2 font-medium" style="color:var(--clr-text-primary);">Notify on events</label>
+                    <div class="flex flex-wrap gap-4">
+                        {% set notif_events = (server.notification_events or '') %}
+                        {% set notif_selected = notif_events.split(',') if notif_events else [] %}
+                        {% for event in ['start', 'stop', 'crash', 'backup'] %}
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" name="event_{{ event }}" value="1"
+                                {% if event in notif_selected %}checked{% endif %}
+                                class="w-4 h-4 rounded" style="border-color:var(--clr-border);background:var(--clr-input);color:var(--clr-accent);">
+                            {{ event }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="events" id="notif-events-hidden-{{ server.id }}">
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">If none selected, all events are delivered (global settings apply). Select specific events to filter.</p>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" class="btn btn-primary btn-sm" id="save-notif-btn">Save Notification Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Environment Variables -->
+    <div class="card mb-6">
+        <div class="card-header flex items-center justify-between">
+            <span>Environment Variables</span>
+            <span class="text-xs" style="color:var(--clr-text-muted);">Changes take effect on next server restart</span>
+        </div>
+        <div class="card-body">
+            <div id="env-editor">
+                <table class="w-full text-sm" id="env-table">
+                    <thead>
+                        <tr style="color:var(--clr-text-muted);" class="text-left">
+                            <th class="pb-2 pr-2">Key</th>
+                            <th class="pb-2 pr-2">Value</th>
+                            <th class="pb-2 w-10"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="env-rows"></tbody>
+                </table>
+                <div class="mt-3 flex gap-2">
+                    <button type="button" id="add-env-row-btn" class="btn btn-secondary btn-sm">+ Add Variable</button>
+                    <button type="button" data-action="saveEnvVars" class="btn btn-primary btn-sm">Save</button>
+                    <span id="env-status" class="text-xs self-center"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uptime Schedule -->
+    <div class="card mb-6">
+        <div class="card-header">Uptime Schedule</div>
+        <div class="card-body">
+            <p class="text-xs mb-4" style="color:var(--clr-text-muted);">
+                Automatically start and stop the server on a time-based schedule. All times are in UTC.
+            </p>
+            <form action="/servers/{{ server.id }}/uptime-schedule" method="post" class="space-y-4">
+                {{ csrf_field(request) }}
+                {% set schedule = {} %}
+                {% if server.uptime_schedule %}
+                    {% set schedule = server.uptime_schedule | tojson | safe %}
+                {% endif %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Start Time (UTC)</label>
+                        <input type="time" name="start_time" id="schedule-start-time"
+                            class="input-field" value="">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Stop Time (UTC)</label>
+                        <input type="time" name="stop_time" id="schedule-stop-time"
+                            class="input-field" value="">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm mb-2 font-medium" style="color:var(--clr-text-primary);">Days of Week</label>
+                    <div class="flex flex-wrap gap-3">
+                        {% set day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+                        {% for i in range(7) %}
+                        <label class="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" name="days" value="{{ i }}" class="schedule-day-cb w-4 h-4 rounded">
+                            <span class="text-sm" style="color:var(--clr-text-secondary);">{{ day_names[i] }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm mb-1 font-medium" style="color:var(--clr-text-primary);">Shutdown Warning (minutes)</label>
+                    <input type="number" name="warning_minutes" id="schedule-warning"
+                        value="0" min="0" max="60"
+                        class="input-field" style="width:100px;">
+                    <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Send a chat warning N minutes before scheduled stop. 0 = no warning.</p>
+                </div>
+                <div class="flex gap-2" style="border-top:1px solid var(--clr-border);padding-top:16px;">
+                    <button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="clearSchedule">Clear Schedule</button>
+                    {% if server.uptime_schedule %}
+                    <span class="badge badge-success self-center">Active</span>
+                    {% else %}
+                    <span class="badge badge-neutral self-center">Not Set</span>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- World Management (Minecraft Java only) -->
+    {% if server.server_type.value == "minecraft_java" %}
+    <div class="card mb-6" id="worlds-panel">
+        <div class="card-header">World Management</div>
+        <div class="card-body">
+            <div id="worlds-list" class="text-sm" style="color:var(--clr-text-secondary);">Loading worlds...</div>
+            {% if not is_running %}
+            <div class="flex gap-2 mt-4 flex-wrap">
+                <form action="/servers/{{ server.id }}/worlds/reset" method="post"
+                      data-confirm='This will DELETE the selected world. A backup will be created first. Continue?'>
+                    {{ csrf_field(request) }}
+                    <div class="flex gap-2">
+                        <select name="world_name" id="world-select" class="input-field" style="width:auto;">
+                            <option value="">Select world...</option>
+                        </select>
+                        <button type="submit" class="btn btn-danger btn-sm">Reset World</button>
+                    </div>
+                </form>
+                <form action="/servers/{{ server.id }}/worlds/switch" method="post" class="flex gap-2">
+                    {{ csrf_field(request) }}
+                    <input name="level_name" placeholder="New world name" class="input-field" style="width:auto;">
+                    <button type="submit" class="btn btn-primary btn-sm">Switch World</button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-xs mt-2" style="color:var(--clr-warning);">Stop the server to manage worlds.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================== -->
+<!-- TAB: Configuration             -->
+<!-- ============================== -->
+{% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
+<div id="panel-config" class="tab-panel hidden">
+    <!-- Typed Properties Editor -->
+    <div id="typed-editor">
+        <form action="/servers/{{ server.id }}/config" method="post">
+            {{ csrf_field(request) }}
+            <input type="hidden" name="_editor_mode" value="typed">
+            <div class="card mb-6">
+                <div class="card-header flex items-center justify-between">
+                    <div>
+                        <span>Server Properties</span>
+                        <p class="text-xs mt-1 font-normal" style="color:var(--clr-text-muted);">Edit server.properties. Changes take effect on next server restart.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="toggleEditor">Switch to Raw Editor</button>
+                </div>
+                <div class="card-body space-y-4">
+                    {% for key, field in config_schema.items() %}
+                    <div class="flex items-center justify-between" {% if not loop.first %}style="border-top:1px solid var(--clr-border);padding-top:16px;"{% endif %}>
+                        <div class="flex-1 pr-4">
+                            <span class="text-sm font-medium" style="color:var(--clr-text-primary);">{{ field.label }}</span>
+                            <p class="text-xs" style="color:var(--clr-text-muted);">{{ key }}</p>
+                        </div>
+                        <div style="min-width:200px;">
+                            {% if field.type == "boolean" %}
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="{{ key }}" value="true"
+                                    {% if config_props.get(key, "true" if field.get("default", False) else "false") == "true" %}checked{% endif %}
+                                    class="w-4 h-4 rounded">
+                                <span class="text-sm" style="color:var(--clr-text-secondary);">
+                                    {{ "Enabled" if config_props.get(key, "true" if field.get("default", False) else "false") == "true" else "Disabled" }}
+                                </span>
+                            </label>
+                            {% elif field.type == "enum" %}
+                            <select name="{{ key }}" class="input-field">
+                                {% for option in field.options %}
+                                <option value="{{ option }}" {% if config_props.get(key, field.get("default", "")) == option %}selected{% endif %}>
+                                    {{ option | title }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            {% elif field.type == "number" %}
+                            <input type="number" name="{{ key }}"
+                                value="{{ config_props.get(key, field.get('default', '')) }}"
+                                {% if field.min is defined %}min="{{ field.min }}"{% endif %}
+                                {% if field.max is defined %}max="{{ field.max }}"{% endif %}
+                                class="input-field">
+                            {% else %}
+                            <input type="text" name="{{ key }}"
+                                value="{{ config_props.get(key, field.get('default', '')) }}"
+                                class="input-field">
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="flex justify-end mb-6">
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Raw Properties Editor (hidden by default) -->
+    <div id="raw-editor" class="hidden">
+        <form action="/servers/{{ server.id }}/config" method="post">
+            {{ csrf_field(request) }}
+            <input type="hidden" name="_editor_mode" value="raw">
+            <div class="card mb-6">
+                <div class="card-header flex items-center justify-between">
+                    <span>Raw Editor</span>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="toggleEditor">Switch to Typed Editor</button>
+                </div>
+                <div class="card-body">
+                    <textarea name="_raw_content" rows="25" class="input-field font-mono text-xs w-full"
+                        style="white-space:pre;overflow-x:auto;">{{ config_raw_content }}</textarea>
+                </div>
+            </div>
+            <div class="flex justify-end mb-6">
+                <button type="submit" class="btn btn-primary">Save Raw Configuration</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Player Management -->
+    <div class="card mb-6">
+        <div class="card-header">
+            <span>Player Management</span>
+        </div>
+        <div class="card-body">
+            {% if is_running and server.rcon_enabled %}
+            <p class="text-xs mb-4" style="color: var(--clr-success);">Server is running with RCON enabled -- changes apply immediately.</p>
+            {% elif is_running %}
+            <p class="text-xs mb-4" style="color: var(--clr-warning);">Server is running but RCON is not enabled. File changes will take effect on restart.</p>
+            {% else %}
+            <p class="text-xs mb-4" style="color: var(--clr-text-muted);">Server is offline. Changes are applied via file edits.</p>
+            {% endif %}
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Whitelist -->
+                <div>
+                    <h3 class="font-semibold mb-4" style="color: var(--clr-text-primary);">Whitelist</h3>
+                    <form action="/servers/{{ server.id }}/whitelist/add" method="post" class="flex gap-2 mb-4">
+                        {{ csrf_field(request) }}
+                        <input type="text" name="name" required placeholder="Player name"
+                            pattern="[a-zA-Z0-9_]{1,16}" title="Minecraft username (1-16 characters, letters/numbers/underscore)"
+                            class="flex-1 input-field">
+                        <button type="submit" class="btn btn-primary">Add</button>
+                    </form>
+                    {% if whitelist %}
+                    <div class="space-y-1 max-h-80 overflow-y-auto">
+                        {% for player in whitelist %}
+                        <div class="flex items-center justify-between py-2 px-3 rounded transition text-sm">
+                            <div>
+                                <span style="color: var(--clr-text-primary);">{{ player.name }}</span>
+                                {% if player.uuid %}
+                                <span class="text-xs ml-2" style="color: var(--clr-text-muted);">{{ player.uuid[:8] }}...</span>
+                                {% endif %}
+                            </div>
+                            <form action="/servers/{{ server.id }}/whitelist/remove" method="post" class="inline">
+                                {{ csrf_field(request) }}
+                                <input type="hidden" name="name" value="{{ player.name }}">
+                                <button class="btn btn-danger btn-sm">Remove</button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <p class="text-xs mt-3" style="color: var(--clr-text-muted);">{{ whitelist | length }} player(s) whitelisted</p>
+                    {% else %}
+                    <p class="text-sm" style="color: var(--clr-text-muted);">No players on the whitelist.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Ban List -->
+                <div>
+                    <h3 class="font-semibold mb-4" style="color: var(--clr-text-primary);">Ban List</h3>
+                    <form action="/servers/{{ server.id }}/ban" method="post" class="flex gap-2 mb-4">
+                        {{ csrf_field(request) }}
+                        <input type="text" name="name" required placeholder="Player name"
+                            pattern="[a-zA-Z0-9_]{1,16}" title="Minecraft username (1-16 characters, letters/numbers/underscore)"
+                            class="flex-1 input-field">
+                        <input type="text" name="reason" placeholder="Reason (optional)"
+                            maxlength="200"
+                            class="flex-1 input-field">
+                        <button type="submit" class="btn btn-danger">Ban</button>
+                    </form>
+                    {% if banned %}
+                    <div class="space-y-1 max-h-80 overflow-y-auto">
+                        {% for player in banned %}
+                        <div class="flex items-center justify-between py-2 px-3 rounded transition text-sm">
+                            <div>
+                                <span style="color: var(--clr-text-primary);">{{ player.name }}</span>
+                                {% if player.reason %}
+                                <span class="text-xs ml-2" style="color: var(--clr-text-muted);">{{ player.reason }}</span>
+                                {% endif %}
+                            </div>
+                            <form action="/servers/{{ server.id }}/pardon" method="post" class="inline">
+                                {{ csrf_field(request) }}
+                                <input type="hidden" name="name" value="{{ player.name }}">
+                                <button class="text-xs px-2 py-1 rounded transition" style="border: 1px solid var(--clr-success); color: var(--clr-success);">Pardon</button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <p class="text-xs mt-3" style="color: var(--clr-text-muted);">{{ banned | length }} player(s) banned</p>
+                    {% else %}
+                    <p class="text-sm" style="color: var(--clr-text-muted);">No players banned.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================== -->
+<!-- TAB: Scheduler                 -->
+<!-- ============================== -->
+<div id="panel-scheduler" class="tab-panel hidden">
+    <!-- Create Task Form -->
+    <div class="card mb-4">
+        <div class="card-header">Create Scheduled Task</div>
+        <div class="card-body">
+            <form action="/scheduler/server/{{ server.id }}/create" method="post">
+                {{ csrf_field(request) }}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm mb-1" style="color:var(--clr-text-secondary);">Task Name</label>
+                        <input type="text" name="name" required class="input-field" placeholder="Daily Backup">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1" style="color:var(--clr-text-secondary);">Task Type</label>
+                        <select name="task_type" class="input-field" id="sched-task-type">
+                            {% for tt in task_types %}
+                            <option value="{{ tt }}">{{ tt | replace("_"," ") | title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1" style="color:var(--clr-text-secondary);">Cron Expression</label>
+                        <input type="text" name="cron_expression" required class="input-field font-mono" placeholder="0 3 * * *">
+                        <p class="text-xs mt-1" style="color:var(--clr-text-muted);">min hour day month weekday (e.g. 0 3 * * * = daily at 03:00)</p>
+                    </div>
+                    <div id="sched-cmd-row" style="display:none;">
+                        <label class="block text-sm mb-1" style="color:var(--clr-text-secondary);">Command</label>
+                        <input type="text" name="command" class="input-field font-mono" placeholder="say Server restarting...">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1" style="color:var(--clr-text-secondary);">Condition</label>
+                        <select name="condition" class="input-field">
+                            <option value="always">Always</option>
+                            <option value="only_running">Only if Running</option>
+                            <option value="only_stopped">Only if Stopped</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">Create Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Task List -->
+    <div class="card">
+        <div class="card-header">Scheduled Tasks</div>
+        <div class="card-body">
+            {% if scheduled_tasks %}
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left table-header" style="color:var(--clr-text-muted);">
+                        <th class="px-3 py-2">Name</th>
+                        <th class="px-3 py-2">Type</th>
+                        <th class="px-3 py-2">Schedule</th>
+                        <th class="px-3 py-2">Condition</th>
+                        <th class="px-3 py-2">Status</th>
+                        <th class="px-3 py-2">Last Result</th>
+                        <th class="px-3 py-2">Duration</th>
+                        <th class="px-3 py-2">Next Run</th>
+                        <th class="px-3 py-2">Last Run</th>
+                        <th class="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in scheduled_tasks %}
+                    <tr class="table-row" style="border-top:1px solid var(--clr-border);">
+                        <td class="px-3 py-2" style="color:var(--clr-text-primary);">{{ task.name }}</td>
+                        <td class="px-3 py-2"><span class="badge badge-info">{{ task.task_type.value }}</span></td>
+                        <td class="px-3 py-2 font-mono text-xs" style="color:var(--clr-text-secondary);">{{ task.cron_expression }}</td>
+                        <td class="px-3 py-2 text-xs" style="color:var(--clr-text-secondary);">{{ (task.condition or 'always') | replace("_"," ") | title }}</td>
+                        <td class="px-3 py-2">
+                            {% if task.enabled %}
+                            <span class="badge badge-success">Enabled</span>
+                            {% else %}
+                            <span class="badge badge-neutral">Disabled</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-xs" style="color:var(--clr-text-secondary);">
+                            {% if task.last_result %}
+                            <span class="{% if task.last_result == 'Success' %}badge badge-success{% elif task.last_result.startswith('Error') %}badge badge-danger{% else %}badge badge-warning{% endif %}">
+                                {{ task.last_result[:30] }}{{ '...' if task.last_result|length > 30 else '' }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-xs" style="color:var(--clr-text-muted);">
+                            {{ '%dms' % task.last_duration_ms if task.last_duration_ms is not none else '-' }}
+                        </td>
+                        <td class="px-3 py-2 text-xs" style="color:var(--clr-text-muted);">
+                            {{ task.next_run.strftime('%d.%m.%Y %H:%M') if task.next_run else '-' }}
+                        </td>
+                        <td class="px-3 py-2 text-xs" style="color:var(--clr-text-muted);">
+                            {{ task.last_run.strftime('%d.%m.%Y %H:%M') if task.last_run else 'Never' }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                            <div class="flex gap-2 justify-end">
+                                <form action="/scheduler/server/{{ server.id }}/{{ task.id }}/run" method="post" class="inline">
+                                    {{ csrf_field(request) }}
+                                    <button type="submit" class="btn btn-sm btn-primary">Run Now</button>
+                                </form>
+                                <form action="/scheduler/server/{{ server.id }}/{{ task.id }}/toggle" method="post" class="inline">
+                                    {{ csrf_field(request) }}
+                                    <button type="submit" class="btn btn-sm btn-secondary">{{ 'Disable' if task.enabled else 'Enable' }}</button>
+                                </form>
+                                <form action="/scheduler/server/{{ server.id }}/{{ task.id }}/delete" method="post" class="inline" data-confirm='Delete this task?'>
+                                    {{ csrf_field(request) }}
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <svg class="w-12 h-12 mx-auto mb-3" style="color:var(--clr-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-sm" style="color:var(--clr-text-muted);">No scheduled tasks for this server yet.</p>
+                <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Create a task above to automate backups, restarts, or commands.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ============================== -->
+<!-- TAB: Mods                      -->
+<!-- ============================== -->
+{% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
+<div id="panel-mods" class="tab-panel hidden">
+    <!-- Hidden CSRF token for JS use -->
+    <input type="hidden" id="csrf-token-value" name="csrf_token" value="{{ request.session.get('csrf_token', '') }}">
+
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span>Mods ({{ mods | length }})</span>
+            <div class="flex items-center gap-2">
+                <button data-action="toggleModSearch" class="btn btn-sm" style="background: var(--clr-success); color: #ffffff;">Search & Install Mods</button>
+                {% if mods %}
+                {% set has_imported = mods | selectattr('project_id', 'equalto', 'imported') | list %}
+                {% if has_imported %}
+                <form action="/servers/{{ server.id }}/mods/resolve-imported" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <button class="btn btn-secondary btn-sm" title="Look up imported mods on Modrinth by file hash to enable update tracking">Resolve Mods</button>
+                </form>
+                {% endif %}
+                <form action="/servers/{{ server.id }}/mods/check-updates" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <button class="btn btn-secondary btn-sm">Check Updates</button>
+                </form>
+                <form action="/servers/{{ server.id }}/mods/update-all" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <button class="btn btn-primary btn-sm">Update All</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body">
+            {% if conflicts %}
+            <div class="rounded-lg p-3 mb-4" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+                <h3 class="font-semibold text-sm mb-1" style="color: var(--clr-warning);">Mod Conflicts Detected</h3>
+                {% for c in conflicts %}
+                <p class="text-xs" style="color: var(--clr-warning);">{{ c.mod_name }} conflicts with {{ c.conflicts_with }}: {{ c.reason }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if mods %}
+            <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left table-header" style="color:var(--clr-text-muted);">
+                        <th class="px-4 py-3 font-medium">Mod</th>
+                        <th class="px-4 py-3 font-medium">Source</th>
+                        <th class="px-4 py-3 font-medium">Installed</th>
+                        <th class="px-4 py-3 font-medium">Latest</th>
+                        <th class="px-4 py-3 font-medium">Max Compatible MC</th>
+                        <th class="px-4 py-3 font-medium">Status</th>
+                        <th class="px-4 py-3 font-medium text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mod in mods %}
+                    <tr class="table-row" style="border-top:1px solid var(--clr-border);">
+                        <td class="px-4 py-3">
+                            <span class="font-medium" style="color:var(--clr-text-primary);">{{ mod.name }}</span>
+                            {% if mod.is_dependency %}
+                            <span class="text-xs" style="color:var(--clr-text-muted);">(dependency)</span>
+                            {% endif %}
+                            {% if mod.file_name %}
+                            <span class="text-xs block" style="color:var(--clr-text-muted);">{{ mod.file_name }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3" style="color:var(--clr-text-secondary);">{{ mod.source | title }}</td>
+                        <td class="px-4 py-3 font-mono text-xs" style="color:var(--clr-text-primary);">{{ mod.installed_version or '-' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs" style="color:var(--clr-text-primary);">{{ mod.latest_version or '-' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs" style="color:var(--clr-text-primary);">{{ mod.max_compatible_mc_version or '-' }}</td>
+                        <td class="px-4 py-3">
+                            {% if mod.update_available %}
+                            <span class="badge badge-warning">Update available</span>
+                            {% else %}
+                            <span class="badge badge-success">Up to date</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                {% if mod.update_available %}
+                                <form action="/servers/{{ server.id }}/mods/{{ mod.id }}/update" method="post" class="inline">
+                                    {{ csrf_field(request) }}
+                                    <button class="btn btn-primary btn-sm">Update</button>
+                                </form>
+                                {% endif %}
+                                <form action="/servers/{{ server.id }}/mods/{{ mod.id }}/delete" method="post" class="inline"
+                                      data-confirm='Remove this mod?'>
+                                    {{ csrf_field(request) }}
+                                    <button class="btn btn-danger btn-sm">Remove</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-sm" style="color:var(--clr-text-muted);">No mods installed.</p>
+                <button data-action="toggleModSearch" class="btn btn-primary btn-sm mt-3">Search & Install Mods</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Inline Search & Install Section -->
+    <div id="mod-search-section" class="hidden mt-4">
+        <div class="card">
+            <div class="card-header">Search & Install Mods</div>
+            <div class="card-body">
+                <div class="flex gap-3 mb-4">
+                    <input type="text" id="mod-search-input" placeholder="Search mods (e.g. 'sodium', 'fabric api')..."
+                        class="input-field flex-1 py-2" data-keydown-action="searchMods">
+                    <button data-action="searchMods" class="btn btn-primary px-4 py-2">Search</button>
+                </div>
+                <div id="mod-search-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modpack Section -->
+    <div class="card mt-4">
+        <div class="card-header">Import Modpack</div>
+        <div class="card-body">
+            <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">
+                Import a Modrinth modpack from a .mrpack file or a Modrinth project URL.
+            </p>
+            <form method="post" action="/servers/{{ server.id }}/mods/import-modpack" enctype="multipart/form-data" class="space-y-3">
+                {{ csrf_field(request) }}
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--clr-text-muted);">Upload .mrpack file</label>
+                    <input type="file" name="file" accept=".mrpack" class="input-field text-sm">
+                </div>
+                <div class="text-xs text-center" style="color: var(--clr-text-muted);">-- or --</div>
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--clr-text-muted);">Modrinth modpack URL or slug</label>
+                    <input type="text" name="modrinth_url" placeholder="https://modrinth.com/modpack/example" class="input-field text-sm">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Import Modpack</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mod Profiles Section -->
+    <div class="card mt-4">
+        <div class="card-header">Mod Profiles</div>
+        <div class="card-body space-y-4">
+            <div>
+                <p class="text-sm mb-2" style="color: var(--clr-text-secondary);">Save your current mods as a reusable profile.</p>
+                <form method="post" action="/servers/{{ server.id }}/mods/save-profile" class="flex gap-2">
+                    {{ csrf_field(request) }}
+                    <input type="text" name="name" placeholder="Profile name" required class="input-field text-sm flex-1">
+                    <button type="submit" class="btn btn-secondary btn-sm">Save Profile</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================== -->
+<!-- TAB: Backups                   -->
+<!-- ============================== -->
+<div id="panel-backups" class="tab-panel hidden">
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span>Backups</span>
+            <form action="/servers/{{ server.id }}/backups/create" method="post" class="inline">
+                {{ csrf_field(request) }}
+                <button class="btn btn-primary btn-sm">Create Backup</button>
+            </form>
+        </div>
+        <div class="card-body">
+            {% if backups %}
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left table-header" style="color:var(--clr-text-muted);">
+                        <th class="px-3 py-2">Filename</th>
+                        <th class="px-3 py-2">Size</th>
+                        <th class="px-3 py-2">Date</th>
+                        <th class="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for backup in backups %}
+                    <tr class="table-row" style="border-top:1px solid var(--clr-border);">
+                        <td class="px-3 py-2" style="color:var(--clr-text-primary);">{{ backup.file_name }}</td>
+                        <td class="px-3 py-2 text-xs" style="color:var(--clr-text-secondary);">
+                            {% if backup.size_bytes %}
+                                {% if backup.size_bytes > 1073741824 %}
+                                    {{ '%.1f' | format(backup.size_bytes / 1073741824) }} GB
+                                {% elif backup.size_bytes > 1048576 %}
+                                    {{ '%.1f' | format(backup.size_bytes / 1048576) }} MB
+                                {% else %}
+                                    {{ '%.1f' | format(backup.size_bytes / 1024) }} KB
+                                {% endif %}
+                            {% else %}
+                                --
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-xs" style="color:var(--clr-text-muted);">
+                            {{ backup.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <form action="/servers/{{ server.id }}/backups/{{ backup.id }}/restore" method="post" class="inline"
+                                      data-confirm='Restore this backup? Current server files will be overwritten.'>
+                                    {{ csrf_field(request) }}
+                                    <button class="btn btn-secondary btn-sm">Restore</button>
+                                </form>
+                                <a href="/servers/{{ server.id }}/backups/{{ backup.id }}/download" class="btn btn-secondary btn-sm">Download</a>
+                                <form action="/servers/{{ server.id }}/backups/{{ backup.id }}/delete" method="post" class="inline"
+                                      data-confirm='Delete this backup?'>
+                                    {{ csrf_field(request) }}
+                                    <button class="btn btn-danger btn-sm">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="text-center py-8">
+                <p class="text-sm" style="color:var(--clr-text-muted);">No backups found.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ============================== -->
+<!-- TAB: Workshop (Steam only)     -->
+<!-- ============================== -->
+{% if server.server_type.value == 'steam' %}
+<div id="panel-workshop" class="tab-panel hidden">
+    <div class="card mb-6">
+        <div class="card-header flex items-center justify-between">
+            <span>Workshop Items</span>
+            <a href="/servers/{{ server.id }}/workshop" class="btn btn-secondary btn-sm">Full Workshop Page</a>
+        </div>
+        <div class="card-body">
+            <!-- Add Workshop Item -->
+            <form action="/servers/{{ server.id }}/workshop/add" method="post" class="flex gap-2 mb-4">
+                {{ csrf_field(request) }}
+                <input type="text" name="workshop_id" placeholder="Workshop Item ID" class="input-field" style="width:auto;flex:1;" required>
+                <button type="submit" class="btn btn-primary btn-sm">Add Item</button>
+            </form>
+
+            {% if workshop_items %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--clr-border);">
+                            <th class="text-left py-2 px-3" style="color: var(--clr-text-muted);">ID</th>
+                            <th class="text-left py-2 px-3" style="color: var(--clr-text-muted);">Name</th>
+                            <th class="text-left py-2 px-3" style="color: var(--clr-text-muted);">Size</th>
+                            <th class="text-left py-2 px-3" style="color: var(--clr-text-muted);">Status</th>
+                            <th class="text-right py-2 px-3" style="color: var(--clr-text-muted);">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in workshop_items %}
+                        <tr style="border-bottom: 1px solid var(--clr-border);">
+                            <td class="py-2 px-3 font-mono text-xs" style="color: var(--clr-text-primary);">
+                                <a href="https://steamcommunity.com/sharedfiles/filedetails/?id={{ item.workshop_id }}" target="_blank" rel="noopener noreferrer" style="color: var(--clr-accent);">{{ item.workshop_id }}</a>
+                            </td>
+                            <td class="py-2 px-3" style="color: var(--clr-text-primary);">
+                                <div>{{ item.name or 'Unknown' }}</div>
+                                {% if item.description %}
+                                <p class="mt-1 text-xs" style="color: var(--clr-text-muted);">{{ item.description[:140] }}{% if item.description|length > 140 %}...{% endif %}</p>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-xs" style="color: var(--clr-text-secondary);">
+                                {% if item.file_size %}
+                                {{ item.file_size | filesizeformat }}
+                                {% else %}
+                                --
+                                {% endif %}
+                                {% if item.last_updated %}
+                                <div class="mt-1" style="color: var(--clr-text-muted);">Updated {{ item.last_updated.strftime('%d.%m.%Y %H:%M') }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3">
+                                {% if item.installed %}
+                                <span class="badge badge-success">Installed</span>
+                                {% else %}
+                                <span class="badge badge-neutral">Not installed</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-right">
+                                <div class="flex gap-2 justify-end">
+                                    {% if not item.installed %}
+                                    <form action="/servers/{{ server.id }}/workshop/{{ item.id }}/update" method="post" class="inline">
+                                        {{ csrf_field(request) }}
+                                        <button class="btn btn-primary btn-sm">Install</button>
+                                    </form>
+                                    {% else %}
+                                    <form action="/servers/{{ server.id }}/workshop/{{ item.id }}/update" method="post" class="inline">
+                                        {{ csrf_field(request) }}
+                                        <button class="btn btn-secondary btn-sm">Update</button>
+                                    </form>
+                                    {% endif %}
+                                    <form action="/servers/{{ server.id }}/workshop/{{ item.id }}/remove" method="post" class="inline"
+                                          data-confirm='Remove this workshop item?'>
+                                        {{ csrf_field(request) }}
+                                        <button class="btn btn-danger btn-sm">Remove</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-sm" style="color: var(--clr-text-muted);">No workshop items added yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================== -->
+<!-- TAB: Files                     -->
+<!-- ============================== -->
+<div id="panel-files" class="tab-panel hidden">
+    <iframe
+        id="files-iframe"
+        src="/servers/{{ server.id }}/files/?embed=1"
+        class="w-full border-0 rounded-lg"
+        style="height: 70vh; background: var(--clr-panel);"
+        loading="lazy"
+    ></iframe>
+</div>
+
+<!-- Clone Server Modal -->
+<div id="clone-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.6);">
+    <div class="card w-full max-w-md shadow-xl">
+        <div class="card-header">Clone Server</div>
+        <div class="card-body">
+            <p class="text-sm mb-4" style="color:var(--clr-text-secondary);">This will duplicate all server files and configuration into a new server instance.</p>
+            <form action="/servers/{{ server.id }}/clone" method="post">
+                {{ csrf_field(request) }}
+                <label class="block text-sm mb-1" style="color:var(--clr-text-primary);">New Server Name</label>
+                <input type="text" name="clone_name" required
+                       placeholder="{{ server.name }} (Clone)"
+                       class="input-field mb-4">
+                <div class="flex gap-3 justify-end">
+                    <button type="button"
+                            data-action="hideCloneModal"
+                            class="btn btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">Clone Server</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Tab Switching -->
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var allTabs = ['console', 'overview', 'settings', 'config', 'scheduler', 'mods', 'workshop', 'backups', 'files'];
+    var storageKey = 'gsm_server_tab_{{ server.id }}';
+
+    function getAvailableTabs() {
+        return Array.prototype.map.call(
+            document.querySelectorAll('#server-tabs .tab-btn[id^="tab-"]'),
+            function(button) {
+                return button.id.replace('tab-', '');
+            }
+        );
+    }
+
+    function resolveTab(tabName, availableTabs) {
+        if (availableTabs.indexOf(tabName) !== -1) {
+            return tabName;
+        }
+        if (availableTabs.indexOf('overview') !== -1) {
+            return 'overview';
+        }
+        return availableTabs[0] || 'overview';
+    }
+
+    window.switchTab = function(tabName) {
+        var availableTabs = getAvailableTabs();
+        var resolvedTab = resolveTab(tabName, availableTabs);
+
+        allTabs.forEach(function(name) {
+            var panel = document.getElementById('panel-' + name);
+            var btn = document.getElementById('tab-' + name);
+            if (panel) panel.classList.add('hidden');
+            if (btn) {
+                btn.classList.remove('tab-btn-active');
+            }
+        });
+        var activePanel = document.getElementById('panel-' + resolvedTab);
+        var activeBtn = document.getElementById('tab-' + resolvedTab);
+        if (activePanel) activePanel.classList.remove('hidden');
+        if (activeBtn) activeBtn.classList.add('tab-btn-active');
+        localStorage.setItem(storageKey, resolvedTab);
+
+        // Trigger resize for charts when their tab becomes visible
+        if (resolvedTab === 'overview') {
+            window.dispatchEvent(new Event('resize'));
+            if (typeof loadMetrics === 'function') {
+                loadMetrics(window._currentPeriod || '1h');
+            }
+        }
+    };
+
+    // Determine initial tab: URL param > localStorage > default
+    var params = new URLSearchParams(window.location.search);
+    var urlTab = params.get('tab');
+    var savedTab = localStorage.getItem(storageKey);
+    var availableTabs = getAvailableTabs();
+    var initialTab = resolveTab('overview', availableTabs);
+    if (availableTabs.indexOf(urlTab) !== -1) {
+        initialTab = urlTab;
+    } else if (availableTabs.indexOf(savedTab) !== -1) {
+        initialTab = savedTab;
+    }
+    switchTab(initialTab);
+})();
+</script>
+
+<!-- Config Editor Toggle -->
+<script nonce="{{ request.state.csp_nonce }}">
+function toggleEditor() {
+    var typed = document.getElementById('typed-editor');
+    var raw = document.getElementById('raw-editor');
+    if (typed) typed.classList.toggle('hidden');
+    if (raw) raw.classList.toggle('hidden');
+}
+</script>
+
+<!-- Mod Search (inline AJAX) -->
+<script nonce="{{ request.state.csp_nonce }}">
+function toggleModSearch() {
+    var section = document.getElementById('mod-search-section');
+    section.classList.toggle('hidden');
+    if (!section.classList.contains('hidden')) {
+        document.getElementById('mod-search-input').focus();
+    }
+}
+
+async function searchMods() {
+    var query = document.getElementById('mod-search-input').value.trim();
+    if (!query) return;
+    var resultsDiv = document.getElementById('mod-search-results');
+    resultsDiv.innerHTML = '<p class="text-sm" style="color:var(--clr-text-muted);">Searching...</p>';
+
+    try {
+        var resp = await fetch('/servers/{{ server.id }}/mods/search/api?q=' + encodeURIComponent(query));
+        var data = await resp.json();
+        renderModSearchResults(data.results);
+    } catch (e) {
+        resultsDiv.innerHTML = '<p class="text-sm" style="color:var(--clr-danger);">Search failed.</p>';
+    }
+}
+
+function renderModSearchResults(results) {
+    var container = document.getElementById('mod-search-results');
+    if (!results || results.length === 0) {
+        container.innerHTML = '<p class="text-sm" style="color:var(--clr-text-muted);">No results found.</p>';
+        return;
+    }
+    var html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+    results.forEach(function(mod) {
+        html += buildModCard(mod);
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function buildModCard(mod) {
+    var csrfToken = document.getElementById('csrf-token-value').value;
+    var icon = '';
+    if (mod.icon_url) {
+        icon = '<img src="' + mod.icon_url + '" alt="" class="w-12 h-12 rounded-lg flex-shrink-0">';
+    } else {
+        icon = '<div class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style="background: var(--clr-input);"><svg class="w-6 h-6" style="color: var(--clr-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></div>';
+    }
+    var downloads = mod.downloads || 0;
+    var categories = (mod.categories || []).join(', ');
+    var description = (mod.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var title = (mod.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var author = (mod.author || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    return '<div class="card p-5">'
+        + '<div class="flex items-start gap-4">'
+        + icon
+        + '<div class="flex-1 min-w-0">'
+        + '<h3 class="font-semibold truncate" style="color: var(--clr-text-primary);">' + title + '</h3>'
+        + '<p class="text-xs mt-0.5" style="color: var(--clr-text-muted);">by ' + author + '</p>'
+        + '<p class="text-sm mt-2 line-clamp-2" style="color: var(--clr-text-secondary);">' + description + '</p>'
+        + '<div class="flex items-center gap-4 mt-3 text-xs" style="color: var(--clr-text-muted);">'
+        + '<span>' + downloads + ' Downloads</span>'
+        + '<span>' + categories + '</span>'
+        + '</div>'
+        + '</div>'
+        + '</div>'
+        + '<form action="/servers/{{ server.id }}/mods/install" method="post" class="mt-4">'
+        + '<input type="hidden" name="csrf_token" value="' + csrfToken + '">'
+        + '<input type="hidden" name="project_id" value="' + mod.project_id + '">'
+        + '<input type="hidden" name="source" value="modrinth">'
+        + '<button type="submit" class="btn w-full py-2 text-sm font-medium" style="background: var(--clr-success); color: #ffffff;">Install</button>'
+        + '</form>'
+        + '</div>';
+}
+</script>
+
+{% if server.server_type.value == 'steam' %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    const panel = document.getElementById('steam-operation-panel');
+    const label = document.getElementById('steam-operation-label');
+    const message = document.getElementById('steam-operation-message');
+    const status = document.getElementById('steam-operation-status');
+    const progressWrap = document.getElementById('steam-operation-progress');
+    const progressBar = document.getElementById('steam-operation-progress-bar');
+    const progressText = document.getElementById('steam-operation-progress-text');
+    const guardForm = document.getElementById('steam-guard-form');
+    const guardOperationId = document.getElementById('steam-guard-operation-id');
+    const guardInput = document.getElementById('steam-guard-code');
+    const guardFeedback = document.getElementById('steam-guard-feedback');
+    const csrfToken = document.getElementById('csrf-token-value') ? document.getElementById('csrf-token-value').value : (document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : '');
+
+    if (!panel) {
+        return;
+    }
+
+    const labels = {
+        install: 'Steam Install',
+        update: 'Steam Update',
+        update_start: 'Steam Update Before Start',
+        validate: 'Steam Validate',
+        workshop_install: 'Workshop Install',
+        workshop_update: 'Workshop Update'
+    };
+    let reconnectTimer = null;
+    const seededSteamOperationSnapshot = {{ steam_operation_snapshot | tojson }};
+    const seededActiveUpdateStart = {{ 'true' if steam_has_active_update_start else 'false' }};
+    const meaningfulSteamStatuses = {
+        queued: true,
+        running: true,
+        waiting_for_steam_guard: true,
+        completed: true,
+        failed: true
+    };
+    let lastState = seededActiveUpdateStart ? seededSteamOperationSnapshot : null;
+    let hasSeenMeaningfulSteamActivity = isMeaningfulSteamStatus(seededSteamOperationSnapshot && seededSteamOperationSnapshot.status);
+    const activeUpdateStartStatuses = {
+        queued: true,
+        running: true,
+        waiting_for_steam_guard: true
+    };
+
+    function cancelStartingReloadTimer() {
+        if (window.serverDetailStartingReloadTimer === null || window.serverDetailStartingReloadTimer === undefined) {
+            return;
+        }
+        window.clearTimeout(window.serverDetailStartingReloadTimer);
+        window.serverDetailStartingReloadTimer = null;
+    }
+
+    function isActiveUpdateStartOperation(event, currentStatus) {
+        return event && event.operation === 'update_start' && !!activeUpdateStartStatuses[currentStatus];
+    }
+
+    function isMeaningfulSteamStatus(currentStatus) {
+        return !!meaningfulSteamStatuses[currentStatus];
+    }
+
+    function showPanel() {
+        panel.classList.remove('hidden');
+    }
+
+    function hidePanel() {
+        panel.classList.add('hidden');
+    }
+
+    function setStatusBadge(kind, text) {
+        status.className = 'badge';
+        if (kind === 'completed') {
+            status.classList.add('badge-success');
+        } else if (kind === 'failed') {
+            status.classList.add('badge-danger');
+        } else if (kind === 'waiting') {
+            status.classList.add('badge-warning');
+        } else if (kind === 'queued') {
+            status.classList.add('badge-neutral');
+        } else if (kind === 'running') {
+            status.classList.add('badge-info');
+        } else {
+            status.classList.add('badge-neutral');
+        }
+        status.textContent = text;
+    }
+
+    function updateGuardState(show, feedbackText, feedbackColor) {
+        if (show) {
+            guardForm.classList.remove('hidden');
+            guardFeedback.classList.remove('hidden');
+            guardFeedback.style.color = feedbackColor || 'var(--clr-warning)';
+            guardFeedback.textContent = feedbackText || 'Steam Guard input is required to continue.';
+            window.setTimeout(function() { guardInput.focus(); }, 0);
+        } else {
+            guardForm.classList.add('hidden');
+            guardFeedback.classList.add('hidden');
+            guardFeedback.textContent = '';
+            guardInput.value = '';
+        }
+    }
+
+    function applyState(event) {
+        if (!event) {
+            hidePanel();
+            return;
+        }
+
+        if (event.type === 'heartbeat') {
+            return;
+        }
+
+        const currentStatus = event.status || event.type || 'idle';
+        const operationLabel = labels[event.operation] || 'SteamCMD';
+        const percent = typeof event.percent === 'number' ? event.percent : 0;
+
+        if (isActiveUpdateStartOperation(event, currentStatus)) {
+            cancelStartingReloadTimer();
+        }
+
+        if (event.type === 'snapshot' && currentStatus === 'idle') {
+            if (!hasSeenMeaningfulSteamActivity) {
+                lastState = event;
+                hidePanel();
+            }
+            return;
+        }
+
+        if (isMeaningfulSteamStatus(currentStatus)) {
+            hasSeenMeaningfulSteamActivity = true;
+        }
+
+        lastState = event;
+
+        showPanel();
+        label.textContent = operationLabel;
+        message.textContent = event.message || 'Steam operation in progress.';
+        guardOperationId.value = event.operation_id || '';
+
+        if (currentStatus === 'queued') {
+            setStatusBadge('queued', 'Queued');
+            updateGuardState(false);
+        } else if (currentStatus === 'completed') {
+            setStatusBadge('completed', 'Completed');
+            updateGuardState(false);
+            if (event.operation === 'update_start' && event.type !== 'snapshot') {
+                window.setTimeout(function() { location.reload(); }, 1200);
+            }
+        } else if (currentStatus === 'failed') {
+            setStatusBadge('failed', 'Failed');
+            updateGuardState(false);
+        } else if (currentStatus === 'waiting_for_steam_guard' || event.type === 'steam_guard_required' || event.type === 'steam_guard_invalid') {
+            setStatusBadge('waiting', 'Steam Guard');
+            updateGuardState(true, event.message, event.type === 'steam_guard_invalid' ? 'var(--clr-danger)' : 'var(--clr-warning)');
+        } else {
+            setStatusBadge('running', 'Running');
+            updateGuardState(false);
+        }
+
+        if (currentStatus === 'queued' || currentStatus === 'running' || currentStatus === 'completed' || currentStatus === 'waiting_for_steam_guard') {
+            progressWrap.classList.remove('hidden');
+            progressBar.style.width = Math.max(0, Math.min(percent, 100)) + '%';
+            progressText.textContent = Math.round(percent) + '%';
+        } else {
+            progressWrap.classList.add('hidden');
+        }
+    }
+
+    function connect() {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(proto + '//' + location.host + '/ws/steamcmd/{{ server.id }}');
+
+        socket.onmessage = function(event) {
+            applyState(JSON.parse(event.data));
+        };
+
+        socket.onclose = function() {
+            if (lastState && lastState.status && lastState.status !== 'completed' && lastState.status !== 'failed') {
+                showPanel();
+                setStatusBadge('waiting', 'Reconnecting');
+                message.textContent = 'Steam progress connection lost. Reconnecting...';
+            }
+            reconnectTimer = window.setTimeout(connect, 2000);
+        };
+    }
+
+    guardForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const operationId = guardOperationId.value;
+        const code = guardInput.value.trim();
+        if (!operationId || !code) {
+            updateGuardState(true, 'Steam Guard code is required.', 'var(--clr-danger)');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('operation_id', operationId);
+        formData.append('steam_guard_code', code);
+        if (csrfToken) {
+            formData.append('csrf_token', csrfToken);
+        }
+
+        fetch('/servers/{{ server.id }}/steam/guard', {
+            method: 'POST',
+            body: formData,
+            headers: csrfToken ? {'X-CSRF-Token': csrfToken} : {}
+        })
+            .then(function(response) {
+                return response.json().then(function(payload) {
+                    return {ok: response.ok, payload: payload};
+                });
+            })
+            .then(function(result) {
+                if (!result.ok || !result.payload.ok) {
+                    updateGuardState(true, result.payload.message || 'Steam Guard submission failed.', 'var(--clr-danger)');
+                    return;
+                }
+                updateGuardState(false);
+                message.textContent = result.payload.message || 'Steam Guard code submitted.';
+                setStatusBadge('running', 'Running');
+            })
+            .catch(function() {
+                updateGuardState(true, 'Steam Guard submission failed.', 'var(--clr-danger)');
+            });
+    });
+
+    connect();
+})();
+</script>
+{% endif %}
+
+<!-- World Management JS -->
+{% if server.server_type.value == "minecraft_java" %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    fetch('/servers/{{ server.id }}/worlds')
+        .then(r => r.json())
+        .then(data => {
+            const list = document.getElementById('worlds-list');
+            const select = document.getElementById('world-select');
+            if (!data.worlds || data.worlds.length === 0) {
+                list.textContent = 'No worlds found.';
+                return;
+            }
+            let html = '<table class="w-full text-sm"><thead><tr style="color:var(--clr-text-muted);" class="text-left"><th class="pb-2">Name</th><th class="pb-2">Size</th><th class="pb-2">Active</th></tr></thead><tbody>';
+            data.worlds.forEach(w => {
+                html += '<tr style="border-top:1px solid var(--clr-border);"><td class="py-1" style="color:var(--clr-text-primary);">' + w.name + '</td><td class="py-1" style="color:var(--clr-text-secondary);">' + w.size_mb + ' MB</td><td class="py-1">' + (w.is_active ? '<span class="badge badge-success">Active</span>' : '') + '</td></tr>';
+                if (select) {
+                    const opt = document.createElement('option');
+                    opt.value = w.name;
+                    opt.textContent = w.name + ' (' + w.size_mb + ' MB)';
+                    select.appendChild(opt);
+                }
+            });
+            html += '</tbody></table>';
+            list.innerHTML = html;
+        })
+        .catch(() => {
+            const list = document.getElementById('worlds-list');
+            if (list) list.textContent = 'Failed to load worlds.';
+        });
+})();
+</script>
+{% endif %}
+
+<!-- Console Log Level & ANSI Color Support -->
+<script nonce="{{ request.state.csp_nonce }}">
+// ANSI color code parser (lightweight, no external dependencies)
+var ansiColors = {
+    '30': '#4b5563', '31': '#ef4444', '32': '#22c55e', '33': '#eab308',
+    '34': '#3b82f6', '35': '#a855f7', '36': '#06b6d4', '37': '#d1d5db',
+    '90': '#6b7280', '91': '#f87171', '92': '#4ade80', '93': '#facc15',
+    '94': '#60a5fa', '95': '#c084fc', '96': '#22d3ee', '97': '#f3f4f6'
+};
+
+function parseAnsi(text) {
+    // Escape HTML first
+    var escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Replace ANSI escape sequences with colored spans
+    var result = escaped.replace(/\x1b\[([0-9;]+)m/g, function(match, codes) {
+        var parts = codes.split(';');
+        for (var i = 0; i < parts.length; i++) {
+            if (ansiColors[parts[i]]) {
+                return '<span style="color:' + ansiColors[parts[i]] + ';">';
+            }
+            if (parts[i] === '0' || parts[i] === '') {
+                return '</span>';
+            }
+            if (parts[i] === '1') {
+                return '<span style="font-weight:bold;">';
+            }
+        }
+        return '</span>';
+    });
+    // Also handle Minecraft section sign color codes
+    result = result.replace(/\u00a7[0-9a-fk-or]/gi, '');
+    return result;
+}
+
+function getLogLevel(line) {
+    if (/\/(ERROR|FATAL)\b/i.test(line) || /\[ERROR\]/i.test(line) || /\[FATAL\]/i.test(line)) return 'error';
+    if (/\/WARN\b/i.test(line) || /\[WARN\]/i.test(line) || /\[WARNING\]/i.test(line)) return 'warn';
+    if (/\/DEBUG\b/i.test(line) || /\[DEBUG\]/i.test(line)) return 'debug';
+    return 'info';
+}
+
+var hiddenLevels = {};
+function toggleLevel(level) {
+    if (hiddenLevels[level]) {
+        delete hiddenLevels[level];
+        document.getElementById('toggle-' + level).style.opacity = '1';
+    } else {
+        hiddenLevels[level] = true;
+        document.getElementById('toggle-' + level).style.opacity = '0.4';
+    }
+    document.querySelectorAll('.console-line[data-level="' + level + '"]').forEach(function(el) {
+        el.style.display = hiddenLevels[level] ? 'none' : '';
+    });
+}
+
+var autoScroll = true;
+function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    document.getElementById('toggle-scroll').textContent = 'Auto-scroll: ' + (autoScroll ? 'ON' : 'OFF');
+}
+
+function createConsoleLine(text) {
+    var div = document.createElement('div');
+    div.className = 'console-line';
+    div.dataset.level = getLogLevel(text);
+    div.innerHTML = parseAnsi(text);
+    if (hiddenLevels[div.dataset.level]) {
+        div.style.display = 'none';
+    }
+    return div;
+}
+</script>
+
+<!-- WebSocket Console + Resource Monitoring -->
+{% if is_running %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    const output = document.getElementById('console-output');
+    const form = document.getElementById('console-form');
+    const input = document.getElementById('console-input');
+    const status = document.getElementById('ws-status');
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}/ws/console/{{ server.id }}`);
+
+    ws.onopen = () => {
+        status.textContent = 'Connected';
+        status.style.color = 'var(--clr-success)';
+        output.innerHTML = '';
+    };
+
+    ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'log') {
+            const div = createConsoleLine(msg.data);
+            output.appendChild(div);
+            if (autoScroll) {
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+    };
+
+    ws.onclose = () => {
+        status.textContent = 'Disconnected';
+        status.style.color = 'var(--clr-danger)';
+    };
+
+    // Command history
+    const historyKey = 'gsm_cmd_history_{{ server.id }}';
+    let commandHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
+    let historyIndex = -1;
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const cmd = input.value.trim();
+        if (cmd && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'command', data: input.value }));
+            if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== cmd) {
+                commandHistory.push(cmd);
+                if (commandHistory.length > 50) {
+                    commandHistory.shift();
+                }
+                localStorage.setItem(historyKey, JSON.stringify(commandHistory));
+            }
+            historyIndex = -1;
+            input.value = '';
+        }
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (commandHistory.length === 0) return;
+            if (historyIndex < commandHistory.length - 1) {
+                historyIndex++;
+            }
+            input.value = commandHistory[commandHistory.length - 1 - historyIndex];
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+                historyIndex--;
+                input.value = commandHistory[commandHistory.length - 1 - historyIndex];
+            } else {
+                historyIndex = -1;
+                input.value = '';
+            }
+        }
+    });
+
+})();
+</script>
+{% endif %}
+
+<!-- Uptime Counter -->
+{% if uptime_seconds is not none %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var uptimeEl = document.getElementById('uptime-display');
+    if (!uptimeEl) return;
+    var seconds = {{ uptime_seconds }};
+    function formatUptime(s) {
+        var h = Math.floor(s / 3600);
+        var m = Math.floor((s % 3600) / 60);
+        return h + 'h ' + m + 'm';
+    }
+    setInterval(function() {
+        seconds += 60;
+        uptimeEl.textContent = formatUptime(seconds);
+    }, 60000);
+})();
+</script>
+{% endif %}
+
+<!-- Resource Monitoring (always active) -->
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    function updateServerStats() {
+        fetch('/servers/{{ server.id }}/stats')
+            .then(r => r.json())
+            .then(d => {
+                const stats = d && d.data ? d.data : d;
+                const runningEl = document.getElementById('resource-running');
+                const offlineEl = document.getElementById('resource-offline');
+                if (stats.running && stats.process) {
+                    if (runningEl) runningEl.classList.remove('hidden');
+                    if (offlineEl) offlineEl.classList.add('hidden');
+                    const cpuEl = document.getElementById('srv-cpu-text');
+                    const cpuBar = document.getElementById('srv-cpu-bar');
+                    const ramEl = document.getElementById('srv-ram-text');
+                    const ramBar = document.getElementById('srv-ram-bar');
+                    if (cpuEl) {
+                        cpuEl.textContent = stats.process.cpu_percent + '%';
+                        cpuBar.style.width = Math.min(stats.process.cpu_percent, 100) + '%';
+                    }
+                    if (ramEl) {
+                        ramEl.textContent = stats.process.ram_mb + ' MB';
+                        const ramPct = stats.system.ram_total_mb > 0 ? (stats.process.ram_mb / stats.system.ram_total_mb * 100) : 0;
+                        ramBar.style.width = Math.min(ramPct, 100) + '%';
+                    }
+                } else {
+                    if (runningEl) runningEl.classList.add('hidden');
+                    if (offlineEl) offlineEl.classList.remove('hidden');
+                }
+            })
+            .catch(err => { console.warn('Stats fetch failed:', err); });
+    }
+    updateServerStats();
+    setInterval(updateServerStats, 3000);
+})();
+</script>
+
+<!-- Log Search -->
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    const searchForm = document.getElementById('log-search-form');
+    const searchInput = document.getElementById('log-search-input');
+    const searchResults = document.getElementById('search-results');
+    const clearBtn = document.getElementById('clear-search-btn');
+    const loadHistoryBtn = document.getElementById('load-history-btn');
+    const output = document.getElementById('console-output');
+
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const q = searchInput.value.trim();
+        if (!q) return;
+        fetch('/servers/{{ server.id }}/logs/search?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                searchResults.innerHTML = '';
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(r => {
+                        const div = document.createElement('div');
+                        div.textContent = '[' + r.file + ':' + r.line_number + '] ' + r.line;
+                        searchResults.appendChild(div);
+                    });
+                } else {
+                    searchResults.textContent = 'No results found.';
+                }
+                searchResults.classList.remove('hidden');
+                clearBtn.classList.remove('hidden');
+            })
+            .catch(() => { searchResults.textContent = 'Search failed.'; searchResults.classList.remove('hidden'); });
+    });
+
+    clearBtn.addEventListener('click', function() {
+        searchResults.innerHTML = '';
+        searchResults.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        searchInput.value = '';
+    });
+
+    loadHistoryBtn.addEventListener('click', function() {
+        fetch('/servers/{{ server.id }}/logs/history?lines=500')
+            .then(r => r.json())
+            .then(data => {
+                if (data.lines && data.lines.length > 0) {
+                    output.innerHTML = '';
+                    data.lines.forEach(line => {
+                        const div = createConsoleLine(line);
+                        output.appendChild(div);
+                    });
+                    output.scrollTop = output.scrollHeight;
+                }
+            })
+            .catch(() => {});
+    });
+})();
+</script>
+
+<!-- RCON Console -->
+{% if server.rcon_enabled %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    const rconForm = document.getElementById('rcon-form');
+    const rconInput = document.getElementById('rcon-input');
+    const rconOutput = document.getElementById('rcon-output');
+    if (!rconForm) return;
+
+    rconForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const cmd = rconInput.value.trim();
+        if (!cmd) return;
+
+        const div = document.createElement('div');
+        div.textContent = '> ' + cmd;
+        div.style.color = 'var(--clr-text-muted)';
+        rconOutput.appendChild(div);
+
+        const formData = new FormData();
+        formData.append('command', cmd);
+
+        const csrfMeta = document.querySelector('[name="csrf_token"]');
+        const headers = {};
+        if (csrfMeta) headers['X-CSRFToken'] = csrfMeta.value;
+
+        fetch('/servers/{{ server.id }}/rcon', {
+            method: 'POST',
+            body: formData,
+            headers: headers
+        })
+        .then(r => r.json())
+        .then(data => {
+            const resp = document.createElement('div');
+            resp.textContent = data.response || '(no response)';
+            resp.style.color = data.ok ? 'var(--clr-warning)' : 'var(--clr-danger)';
+            rconOutput.appendChild(resp);
+            rconOutput.scrollTop = rconOutput.scrollHeight;
+        })
+        .catch(() => {
+            const resp = document.createElement('div');
+            resp.textContent = 'Request failed';
+            resp.style.color = 'var(--clr-danger)';
+            rconOutput.appendChild(resp);
+        });
+
+        rconInput.value = '';
+    });
+})();
+</script>
+{% endif %}
+
+<!-- Performance Chart -->
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var ctx = document.getElementById('perf-chart');
+    if (!ctx) return;
+
+    window._currentPeriod = '1h';
+    var perfChart = null;
+
+    function createChart(data) {
+        var labels = data.map(function(d) {
+            var dt = new Date(d.timestamp);
+            return dt.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        });
+        var cpuData = data.map(function(d) { return d.cpu_percent; });
+        var ramData = data.map(function(d) { return d.memory_mb; });
+
+        if (perfChart) perfChart.destroy();
+
+        perfChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'CPU %',
+                        data: cpuData,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99,102,241,0.1)',
+                        yAxisID: 'y',
+                        tension: 0.3,
+                        pointRadius: 0,
+                    },
+                    {
+                        label: 'RAM (MB)',
+                        data: ramData,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34,197,94,0.1)',
+                        yAxisID: 'y1',
+                        tension: 0.3,
+                        pointRadius: 0,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: 'CPU %', color: '#94a3b8' },
+                        min: 0,
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'RAM (MB)', color: '#94a3b8' },
+                        min: 0,
+                        ticks: { color: '#94a3b8' },
+                        grid: { drawOnChartArea: false },
+                    },
+                    x: {
+                        ticks: { color: '#94a3b8', maxTicksLimit: 12 },
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#e2e8f0' } }
+                }
+            }
+        });
+    }
+
+    window.loadMetrics = function(period) {
+        window._currentPeriod = period;
+        document.querySelectorAll('.period-btn').forEach(function(btn) {
+            if (btn.dataset.period === period) {
+                btn.className = 'period-btn btn btn-primary btn-sm';
+            } else {
+                btn.className = 'period-btn btn btn-secondary btn-sm';
+            }
+        });
+        fetch('/servers/{{ server.id }}/metrics?period=' + period)
+            .then(function(r) { return r.json(); })
+            .then(function(data) { createChart(data); })
+            .catch(function() {});
+    };
+
+    document.querySelectorAll('.period-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { loadMetrics(btn.dataset.period); });
+    });
+
+    loadMetrics('1h');
+    setInterval(function() { if (window._currentPeriod === '1h') loadMetrics('1h'); }, 30000);
+})();
+</script>
+
+<!-- Server Update Check -->
+<script nonce="{{ request.state.csp_nonce }}">
+function checkServerUpdate() {
+    var btn = document.getElementById('check-update-btn');
+    var result = document.getElementById('update-check-result');
+    if (!btn || !result) return;
+    btn.disabled = true;
+    btn.textContent = 'Checking...';
+    result.textContent = '';
+    fetch('/servers/{{ server.id }}/update-check')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = 'Check Updates';
+            if (data.ok && data.data) {
+                if (data.data.update_available) {
+                    result.textContent = 'Update available: ' + data.data.latest;
+                    result.style.color = 'var(--clr-warning)';
+                } else {
+                    result.textContent = 'Up to date';
+                    result.style.color = 'var(--clr-success)';
+                }
+            } else {
+                result.textContent = 'Unable to check';
+                result.style.color = 'var(--clr-text-muted)';
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.textContent = 'Check Updates';
+            result.textContent = 'Check failed';
+            result.style.color = 'var(--clr-danger)';
+        });
+}
+</script>
+
+<!-- Environment Variables -->
+<script nonce="{{ request.state.csp_nonce }}">
+function addEnvRow(key, value) {
+    var tbody = document.getElementById('env-rows');
+    var tr = document.createElement('tr');
+    tr.style.borderTop = '1px solid var(--clr-border)';
+    tr.innerHTML = '<td class="py-1 pr-2"><input type="text" class="env-key input-field" value="' + (key || '') + '" placeholder="KEY"></td>' +
+        '<td class="py-1 pr-2"><input type="text" class="env-val input-field" value="' + (value || '') + '" placeholder="value"></td>' +
+        '<td class="py-1"><button type="button" class="btn btn-danger btn-sm env-remove-btn">x</button></td>';
+    tbody.appendChild(tr);
+}
+
+document.getElementById('env-rows').addEventListener('click', function(e) {
+    var btn = e.target.closest('.env-remove-btn');
+    if (btn) {
+        var row = btn.closest('tr');
+        if (row) row.remove();
+    }
+});
+
+function saveEnvVars() {
+    var rows = document.querySelectorAll('#env-rows tr');
+    var env = {};
+    rows.forEach(function(row) {
+        var key = row.querySelector('.env-key').value.trim();
+        var val = row.querySelector('.env-val').value;
+        if (key) env[key] = val;
+    });
+    var status = document.getElementById('env-status');
+    fetch('/servers/{{ server.id }}/env', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': '{{ request.session.get("csrf_token", "") }}'
+        },
+        body: JSON.stringify({env: env})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            status.textContent = 'Saved';
+            status.style.color = 'var(--clr-success)';
+        } else {
+            status.textContent = data.detail || 'Error';
+            status.style.color = 'var(--clr-danger)';
+        }
+        setTimeout(function() { status.textContent = ''; }, 3000);
+    })
+    .catch(function() {
+        status.textContent = 'Save failed';
+        status.style.color = 'var(--clr-danger)';
+    });
+}
+
+(function() {
+    fetch('/servers/{{ server.id }}/env')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok && data.data) {
+                var keys = Object.keys(data.data);
+                if (keys.length === 0) return;
+                keys.forEach(function(k) {
+                    addEnvRow(k, data.data[k]);
+                });
+            }
+        })
+        .catch(function() {});
+
+    var addEnvBtn = document.getElementById('add-env-row-btn');
+    if (addEnvBtn) {
+        addEnvBtn.addEventListener('click', function() {
+            addEnvRow('', '');
+        });
+    }
+})();
+</script>
+
+<!-- Player List -->
+<script nonce="{{ request.state.csp_nonce }}">
+function refreshPlayers() {
+    var listEl = document.getElementById('player-list');
+    var countEl = document.getElementById('player-count');
+    if (!listEl) return;
+    listEl.textContent = 'Loading...';
+    fetch('/servers/{{ server.id }}/players')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (countEl) {
+                var maxStr = data.max ? ' / ' + data.max : '';
+                countEl.textContent = data.online + maxStr + ' online';
+            }
+            if (!data.players || data.players.length === 0) {
+                listEl.textContent = 'No players online';
+                return;
+            }
+            var html = '<div class="flex flex-wrap gap-2">';
+            data.players.forEach(function(p) {
+                var name = p.name || 'Unknown';
+                html += '<span class="badge badge-neutral">' + name + '</span>';
+            });
+            html += '</div>';
+            listEl.innerHTML = html;
+        })
+        .catch(function() {
+            listEl.textContent = 'Failed to load player list';
+        });
+}
+{% if is_running %}
+refreshPlayers();
+setInterval(refreshPlayers, 30000);
+{% endif %}
+</script>
+
+<!-- Startup Parameters JS -->
+<script nonce="{{ request.state.csp_nonce }}">
+// Uptime Schedule: load existing values
+(function() {
+    var rawSchedule = {{ server.uptime_schedule | tojson }};
+    if (rawSchedule) {
+        try {
+            var sched = JSON.parse(rawSchedule);
+            var startEl = document.getElementById('schedule-start-time');
+            var stopEl = document.getElementById('schedule-stop-time');
+            var warnEl = document.getElementById('schedule-warning');
+            if (startEl && sched.start_time) startEl.value = sched.start_time;
+            if (stopEl && sched.stop_time) stopEl.value = sched.stop_time;
+            if (warnEl && sched.warning_minutes !== undefined) warnEl.value = sched.warning_minutes;
+            if (sched.days && sched.days.length > 0) {
+                var cbs = document.querySelectorAll('.schedule-day-cb');
+                cbs.forEach(function(cb) {
+                    if (sched.days.indexOf(parseInt(cb.value)) !== -1) {
+                        cb.checked = true;
+                    }
+                });
+            }
+        } catch(e) {}
+    }
+
+    window.clearSchedule = function() {
+        document.getElementById('schedule-start-time').value = '';
+        document.getElementById('schedule-stop-time').value = '';
+        document.getElementById('schedule-warning').value = '0';
+        document.querySelectorAll('.schedule-day-cb').forEach(function(cb) { cb.checked = false; });
+        // Submit the form to clear the schedule
+        document.querySelector('form[action$="/uptime-schedule"]').submit();
+    };
+})();
+</script>
+
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var aikarBase = [
+        '-XX:+UseG1GC',
+        '-XX:+ParallelRefProcEnabled',
+        '-XX:MaxGCPauseMillis=200',
+        '-XX:+UnlockExperimentalVMOptions',
+        '-XX:+DisableExplicitGC',
+        '-XX:+AlwaysPreTouch',
+        '-XX:G1NewSizePercent=30',
+        '-XX:G1MaxNewSizePercent=40',
+        '-XX:G1HeapRegionSize=8M',
+        '-XX:G1ReservePercent=20',
+        '-XX:G1HeapWastePercent=5',
+        '-XX:G1MixedGCCountTarget=4',
+        '-XX:InitiatingHeapOccupancyPercent=15',
+        '-XX:G1MixedGCLiveThresholdPercent=90',
+        '-XX:G1RSetUpdatingPauseTimePercent=5',
+        '-XX:SurvivorRatio=32',
+        '-XX:+PerfDisableSharedMem',
+        '-XX:MaxTenuringThreshold=1'
+    ];
+    var aikar8Extra = [
+        '-XX:G1NewSizePercent=40',
+        '-XX:G1MaxNewSizePercent=50',
+        '-XX:G1HeapRegionSize=16M',
+        '-XX:G1ReservePercent=15',
+        '-XX:InitiatingHeapOccupancyPercent=20'
+    ];
+
+    window.setAikarFlags = function(size) {
+        var flags = aikarBase.slice();
+        if (size >= 8) {
+            // Override certain values for 8G+
+            var overrides = {};
+            aikar8Extra.forEach(function(f) { var k = f.split('=')[0]; overrides[k] = f; });
+            flags = flags.map(function(f) { var k = f.split('=')[0]; return overrides[k] || f; });
+        }
+        document.getElementById('jvm-flags-input').value = flags.join('\n');
+        updateCmdPreview();
+    };
+
+    function updateCmdPreview() {
+        var el = document.getElementById('cmd-preview');
+        if (!el) return;
+        var javaPath = {{ server.java_path | tojson }};
+        var minMem = {{ server.min_memory }};
+        var maxMem = {{ server.max_memory }};
+        var exe = {{ server.executable | tojson }};
+        var parts = [javaPath, '-Xms' + minMem + 'M', '-Xmx' + maxMem + 'M'];
+        var flagsVal = document.getElementById('jvm-flags-input').value.trim();
+        if (flagsVal) {
+            flagsVal.split('\n').forEach(function(f) { f = f.trim(); if (f) parts.push(f); });
+        }
+        parts.push('-jar', exe);
+        var argsVal = document.getElementById('server-args-input').value.trim();
+        if (argsVal) {
+            argsVal.split('\n').forEach(function(a) { a = a.trim(); if (a) parts.push(a); });
+        } else {
+            parts.push('nogui');
+        }
+        el.textContent = parts.join(' ');
+    }
+
+    var fi = document.getElementById('jvm-flags-input');
+    var ai = document.getElementById('server-args-input');
+    if (fi) { fi.addEventListener('input', updateCmdPreview); }
+    if (ai) { ai.addEventListener('input', updateCmdPreview); }
+    updateCmdPreview();
+})();
+</script>
+
+<!-- Port Check -->
+<script nonce="{{ request.state.csp_nonce }}">
+async function checkPort() {
+    var el = document.getElementById('port-result');
+    el.textContent = 'Checking...';
+    el.style.color = 'var(--clr-text-muted)';
+    try {
+        var resp = await fetch('/servers/{{ server.id }}/port-check');
+        var data = await resp.json();
+        if (data.reachable) {
+            el.textContent = 'Reachable';
+            el.style.color = 'var(--clr-success)';
+        } else {
+            el.textContent = 'Not reachable';
+            el.style.color = 'var(--clr-danger)';
+        }
+    } catch (e) {
+        el.textContent = 'Check failed';
+        el.style.color = 'var(--clr-danger)';
+    }
+}
+</script>
+
+<!-- Invite Links Management -->
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    function loadInvites() {
+        fetch('/servers/{{ server.id }}/invites')
+            .then(function(r) { return r.json(); })
+            .then(function(invites) {
+                var list = document.getElementById('invite-list');
+                if (!invites || invites.length === 0) {
+                    list.textContent = 'No invite links created yet.';
+                    return;
+                }
+                var html = '<table class="w-full text-sm"><thead><tr style="color:var(--clr-text-muted);" class="text-left"><th class="pb-2">Code</th><th class="pb-2">Role</th><th class="pb-2">Uses</th><th class="pb-2">Status</th><th class="pb-2 text-right">Actions</th></tr></thead><tbody>';
+                invites.forEach(function(inv) {
+                    var status = inv.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-neutral">Revoked</span>';
+                    var uses = inv.uses + (inv.max_uses ? '/' + inv.max_uses : '/--');
+                    html += '<tr style="border-top:1px solid var(--clr-border);"><td class="py-1 font-mono text-xs" style="color:var(--clr-text-primary);">' + inv.code.substring(0, 12) + '...</td><td class="py-1">' + inv.role + '</td><td class="py-1">' + uses + '</td><td class="py-1">' + status + '</td><td class="py-1 text-right">';
+                    if (inv.is_active) {
+                        html += '<button data-revoke-id="' + inv.id + '" class="btn btn-danger btn-sm revoke-invite-btn" style="font-size:0.7rem;">Revoke</button>';
+                    }
+                    html += '</td></tr>';
+                });
+                html += '</tbody></table>';
+                list.innerHTML = html;
+                list.querySelectorAll('.revoke-invite-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        revokeInvite(parseInt(btn.dataset.revokeId, 10));
+                    });
+                });
+            })
+            .catch(function() {
+                document.getElementById('invite-list').textContent = 'Failed to load invites.';
+            });
+    }
+
+    window.generateInvite = function() {
+        var role = document.getElementById('invite-role').value;
+        var maxUses = document.getElementById('invite-max-uses').value;
+        var hours = document.getElementById('invite-hours').value;
+        var csrfInput = document.querySelector('[name="csrf_token"]');
+        var csrfToken = csrfInput ? csrfInput.value : '';
+
+        var formData = new FormData();
+        formData.append('role', role);
+        formData.append('max_uses', maxUses);
+        formData.append('hours_valid', hours);
+        formData.append('csrf_token', csrfToken);
+
+        fetch('/servers/{{ server.id }}/invite', { method: 'POST', body: formData })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    document.getElementById('invite-url-display').value = data.url;
+                    document.getElementById('invite-result').classList.remove('hidden');
+                    loadInvites();
+                }
+            })
+            .catch(function() { alert('Failed to create invite link.'); });
+    };
+
+    window.revokeInvite = function(inviteId) {
+        if (!confirm('Revoke this invite link?')) return;
+        var csrfInput = document.querySelector('[name="csrf_token"]');
+        var csrfToken = csrfInput ? csrfInput.value : '';
+
+        var formData = new FormData();
+        formData.append('csrf_token', csrfToken);
+
+        fetch('/servers/{{ server.id }}/invites/' + inviteId + '/revoke', { method: 'POST', body: formData })
+            .then(function() { loadInvites(); })
+            .catch(function() { alert('Failed to revoke invite.'); });
+    };
+
+    loadInvites();
+})();
+</script>
+
+<!-- Console Enhancements: Clear, Tab-Complete, Saved Commands -->
+<script nonce="{{ request.state.csp_nonce }}">
+function clearConsole() {
+    var output = document.getElementById('console-output');
+    if (output) output.innerHTML = '';
+}
+
+(function() {
+    // Minecraft command hints for tab completion
+    var mcCommands = [
+        'list', 'stop', 'say', 'op', 'deop', 'ban', 'pardon', 'whitelist',
+        'gamemode', 'tp', 'give', 'kill', 'time', 'weather', 'difficulty',
+        'gamerule', 'seed', 'kick', 'msg', 'tell', 'save-all', 'save-on', 'save-off',
+        'help', 'reload', 'summon', 'setblock', 'fill', 'clone', 'clear',
+        'effect', 'enchant', 'experience', 'scoreboard', 'title', 'teleport',
+    ];
+
+    var input = document.getElementById('console-input');
+    var popup = document.getElementById('tab-complete-popup');
+    if (!input || !popup) return;
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            var val = input.value.trim().toLowerCase();
+            if (!val) return;
+            var matches = mcCommands.filter(function(cmd) { return cmd.startsWith(val); });
+            if (matches.length === 1) {
+                input.value = matches[0] + ' ';
+                popup.classList.add('hidden');
+            } else if (matches.length > 1) {
+                popup.innerHTML = '';
+                matches.forEach(function(cmd) {
+                    var item = document.createElement('div');
+                    item.textContent = cmd;
+                    item.className = 'px-2 py-1 cursor-pointer rounded';
+                    item.style.cssText = 'color:var(--clr-text-primary);';
+                    item.onmouseenter = function() { item.style.background = 'var(--clr-accent-subtle)'; };
+                    item.onmouseleave = function() { item.style.background = 'none'; };
+                    item.onclick = function() {
+                        input.value = cmd + ' ';
+                        popup.classList.add('hidden');
+                        input.focus();
+                    };
+                    popup.appendChild(item);
+                });
+                // Position popup above input
+                var rect = input.getBoundingClientRect();
+                popup.style.left = rect.left + 'px';
+                popup.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                popup.style.position = 'fixed';
+                popup.classList.remove('hidden');
+            }
+        } else if (e.key === 'Escape') {
+            popup.classList.add('hidden');
+        }
+    });
+
+    input.addEventListener('input', function() {
+        popup.classList.add('hidden');
+    });
+
+    // Load saved command shortcuts
+    fetch('/servers/{{ server.id }}/saved-commands')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var bar = document.getElementById('saved-commands-bar');
+            if (!data.commands || data.commands.length === 0) return;
+            bar.classList.remove('hidden');
+            data.commands.forEach(function(cmd) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'px-2 py-1 rounded text-xs';
+                btn.style.cssText = 'background:var(--clr-accent-subtle);color:var(--clr-accent);';
+                btn.textContent = cmd.label || cmd.command;
+                btn.addEventListener('click', function() {
+                    var cmdInput = document.getElementById('console-input');
+                    if (cmdInput) {
+                        cmdInput.value = cmd.command;
+                        cmdInput.focus();
+                    }
+                });
+                bar.appendChild(btn);
+            });
+        })
+        .catch(function() {});
+
+    // Copy server address
+    var copyAddrBtn = document.getElementById('copy-address-btn');
+    if (copyAddrBtn) {
+        copyAddrBtn.addEventListener('click', function() {
+            navigator.clipboard.writeText(document.getElementById('server-address').textContent).then(function() {
+                copyAddrBtn.textContent = 'Copied!';
+                setTimeout(function() { copyAddrBtn.textContent = 'Copy'; }, 1500);
+            });
+        });
+    }
+
+    // Save notification settings
+    var saveNotifBtn = document.getElementById('save-notif-btn');
+    if (saveNotifBtn) {
+        saveNotifBtn.addEventListener('click', function() {
+            var checked = [];
+            document.querySelectorAll('input[name^=event_]:checked').forEach(function(cb) {
+                checked.push(cb.name.replace('event_', ''));
+            });
+            document.getElementById('notif-events-hidden-{{ server.id }}').value = checked.join(',');
+        });
+    }
+
+    // Schedule task type visibility
+    var schedType = document.getElementById('sched-task-type');
+    if (schedType) {
+        schedType.addEventListener('change', function() {
+            document.getElementById('sched-cmd-row').style.display = schedType.value === 'command' ? 'block' : 'none';
+        });
+    }
+})();
+</script>
+{% endblock %}

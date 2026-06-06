@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Two-Factor Verification{% endblock %}
+
+{% block breadcrumb %}
+<span style="color: var(--clr-text-primary);">Two-Factor Verification</span>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-16">
+    <div class="card p-6">
+        <h1 class="text-2xl font-bold mb-2" style="color: var(--clr-text-primary);">Two-Factor Verification</h1>
+        <p class="text-sm mb-6" style="color: var(--clr-text-secondary);">Enter the 6-digit code from your authenticator app.</p>
+
+        {% if error %}
+        <div class="rounded-lg p-3 mb-4" style="background: var(--clr-danger-bg); border: 1px solid var(--clr-danger);">
+            <p class="text-sm" style="color: var(--clr-danger);">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        <form action="/login/2fa" method="post" id="totp-form">
+            {{ csrf_field(request) }}
+            <div class="mb-4" id="totp-section">
+                <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="code">Authentication Code</label>
+                <input type="text" id="code" name="code"
+                    maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code"
+                    class="input-field text-center text-lg tracking-widest"
+                    placeholder="000000" autofocus>
+            </div>
+            <div class="mb-4 hidden" id="recovery-section">
+                <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="recovery_code">Recovery Code</label>
+                <input type="text" id="recovery_code" name="recovery_code"
+                    maxlength="8"
+                    class="input-field text-center text-lg tracking-widest"
+                    placeholder="ABCD1234">
+            </div>
+            <button type="submit"
+                class="btn btn-primary w-full py-3 text-sm font-medium">
+                Verify
+            </button>
+        </form>
+
+        <div class="mt-4 flex justify-between text-sm">
+            <button id="toggle-recovery" class="transition" style="color: var(--clr-accent);"
+                    data-action="toggleRecovery">
+                Use recovery code instead
+            </button>
+            <a href="/login" class="transition" style="color: var(--clr-text-muted);">Back to login</a>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ request.state.csp_nonce }}">
+function toggleRecovery() {
+    var totp = document.getElementById('totp-section');
+    var recovery = document.getElementById('recovery-section');
+    var btn = document.getElementById('toggle-recovery');
+    if (recovery.classList.contains('hidden')) {
+        recovery.classList.remove('hidden');
+        totp.classList.add('hidden');
+        btn.textContent = 'Use authenticator code instead';
+        document.getElementById('recovery_code').focus();
+    } else {
+        recovery.classList.add('hidden');
+        totp.classList.remove('hidden');
+        btn.textContent = 'Use recovery code instead';
+        document.getElementById('code').focus();
+    }
+}
+</script>
+{% endblock %}

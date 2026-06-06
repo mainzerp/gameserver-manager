@@ -1,0 +1,46 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+
+# Database
+data/*.db
+
+# Server files
+servers/
+
+# Node.js
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Agent docs
+docs/SubAgent/
+./kilo
+AGENTS.md
+
+# Test artifacts
+admin-test-user.md
+
+# ZIP files in project root (test uploads etc.)
+*.zip

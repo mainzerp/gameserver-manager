@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Mods - {{ server.name }} - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/{{ server.id }}" style="color: var(--clr-text-muted);" class="hover:underline">{{ server.name }}</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Mods</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Manage Mods</h1>
+        <div class="flex gap-2">
+            <form action="/servers/{{ server.id }}/mods/check-updates" method="post">
+                {{ csrf_field(request) }}
+                <button class="btn btn-secondary btn-sm">
+                    Check Updates
+                </button>
+            </form>
+            <form action="/servers/{{ server.id }}/mods/update-all" method="post">
+                {{ csrf_field(request) }}
+                <button class="btn btn-primary btn-sm">
+                    Update All
+                </button>
+            </form>
+            <a href="/servers/{{ server.id }}/mods/search"
+               class="btn btn-sm" style="background: var(--clr-success); color: #ffffff;">
+                + Add Mod
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if conflicts %}
+<div class="rounded-lg p-3 mb-4" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+    <h3 class="font-semibold text-sm mb-1" style="color: var(--clr-warning);">Mod Conflicts Detected</h3>
+    {% for c in conflicts %}
+    <p class="text-xs" style="color: var(--clr-warning);">{{ c.mod_name }} conflicts with {{ c.conflicts_with }}: {{ c.reason }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if mods %}
+<div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="table-header" style="color: var(--clr-text-muted);">
+                <th class="text-left px-4 py-3 font-medium">Mod</th>
+                <th class="text-left px-4 py-3 font-medium">Source</th>
+                <th class="text-left px-4 py-3 font-medium">Installed</th>
+                <th class="text-left px-4 py-3 font-medium">Latest</th>
+                <th class="text-left px-4 py-3 font-medium">Status</th>
+                <th class="text-right px-4 py-3 font-medium">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mod in mods %}
+            <tr class="table-row" style="border-top: 1px solid var(--clr-border);">
+                <td class="px-4 py-3">
+                    <span class="font-medium" style="color: var(--clr-text-primary);">{{ mod.name }}</span>
+                    {% if mod.is_dependency %}
+                    <span class="text-xs" style="color: var(--clr-text-muted);">(dependency)</span>
+                    {% endif %}
+                    {% if mod.file_name %}
+                    <span class="text-xs block" style="color: var(--clr-text-muted);">{{ mod.file_name }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3" style="color: var(--clr-text-secondary);">{{ mod.source | title }}</td>
+                <td class="px-4 py-3 font-mono text-xs" style="color: var(--clr-text-primary);">{{ mod.installed_version or '-' }}</td>
+                <td class="px-4 py-3 font-mono text-xs" style="color: var(--clr-text-primary);">{{ mod.latest_version or '-' }}</td>
+                <td class="px-4 py-3">
+                    {% if mod.update_available %}
+                    <span class="badge badge-warning">Update available</span>
+                    {% else %}
+                    <span class="badge badge-success">Up to date</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        {% if mod.update_available %}
+                        <form action="/servers/{{ server.id }}/mods/{{ mod.id }}/update" method="post">
+                            {{ csrf_field(request) }}
+                            <button class="text-xs transition" style="color: var(--clr-accent);">Update</button>
+                        </form>
+                        {% endif %}
+                        <form action="/servers/{{ server.id }}/mods/{{ mod.id }}/delete" method="post"
+                              data-confirm='Really remove this mod?'>
+                            {{ csrf_field(request) }}
+                            <button class="text-xs transition" style="color: var(--clr-danger);">Remove</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% else %}
+<div class="card p-12 text-center">
+    <p class="mb-4" style="color: var(--clr-text-secondary);">No mods installed.</p>
+    <a href="/servers/{{ server.id }}/mods/search"
+       class="btn btn-primary inline-block">
+        Search and install mods
+    </a>
+</div>
+{% endif %}
+
+<!-- Import Modpack Section -->
+<div class="card mt-6">
+    <div class="card-header">Import Modpack</div>
+    <div class="card-body">
+        <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">
+            Import a Modrinth modpack from a .mrpack file or a Modrinth project URL.
+        </p>
+        <form method="post" action="/servers/{{ server.id }}/mods/import-modpack" enctype="multipart/form-data" class="space-y-3">
+            {{ csrf_field(request) }}
+            <div>
+                <label class="block text-xs font-medium mb-1" style="color: var(--clr-text-muted);">Upload .mrpack file</label>
+                <input type="file" name="file" accept=".mrpack" class="input-field text-sm">
+            </div>
+            <div class="text-xs text-center" style="color: var(--clr-text-muted);">-- or --</div>
+            <div>
+                <label class="block text-xs font-medium mb-1" style="color: var(--clr-text-muted);">Modrinth modpack URL or slug</label>
+                <input type="text" name="modrinth_url" placeholder="https://modrinth.com/modpack/example" class="input-field text-sm">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Import Modpack</button>
+        </form>
+    </div>
+</div>
+
+<!-- Save/Load Profile Section -->
+<div class="card mt-6">
+    <div class="card-header">Mod Profiles</div>
+    <div class="card-body space-y-4">
+        <div>
+            <p class="text-sm mb-2" style="color: var(--clr-text-secondary);">Save your current mods as a reusable profile.</p>
+            <form method="post" action="/servers/{{ server.id }}/mods/save-profile" class="flex gap-2">
+                {{ csrf_field(request) }}
+                <input type="text" name="name" placeholder="Profile name" required class="input-field text-sm flex-1">
+                <button type="submit" class="btn btn-secondary btn-sm">Save Profile</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

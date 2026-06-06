@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Upload ZIP Server - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/create" style="color: var(--clr-text-muted);" class="hover:underline">New Server</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Upload ZIP</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Upload Server ZIP</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">Upload a .zip archive of an existing game server directory. The archive will be extracted and registered automatically.</p>
+</div>
+
+<form action="/servers/upload-zip" method="post" enctype="multipart/form-data" class="max-w-2xl">
+    {{ csrf_field(request) }}
+    <div class="card p-6 space-y-6">
+
+        {% if errors %}
+        <div class="rounded-lg p-4" style="background: var(--clr-danger-bg); border: 1px solid var(--clr-danger);">
+            <ul class="list-disc list-inside text-sm space-y-1" style="color: var(--clr-danger);">
+                {% for error in errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- ZIP file input -->
+        <div>
+            <label class="block text-sm font-medium mb-2" for="zip_file">Server ZIP Archive</label>
+            <input type="file" id="zip_file" name="zip_file" accept=".zip" required
+                class="input-field">
+            <p class="text-xs mt-1" style="color: var(--clr-text-muted);">Maximum size: 10 GB. Must be a valid .zip file.</p>
+        </div>
+
+        <!-- Server Name -->
+        <div>
+            <label class="block text-sm font-medium mb-2" for="name">Server Name</label>
+            <input type="text" id="name" name="name" required
+                minlength="1" maxlength="50"
+                value="{{ form_values.get('name', '') }}"
+                class="input-field"
+                placeholder="My Server">
+        </div>
+
+        <!-- Server Type + Port -->
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-2" for="server_type">Server Type</label>
+                <select id="server_type" name="server_type" class="input-field">
+                    <option value="minecraft_java" {% if form_values.get('server_type','minecraft_java') == 'minecraft_java' %}selected{% endif %}>Minecraft Java</option>
+                    <option value="minecraft_bedrock" {% if form_values.get('server_type') == 'minecraft_bedrock' %}selected{% endif %}>Minecraft Bedrock</option>
+                    <option value="steam" {% if form_values.get('server_type') == 'steam' %}selected{% endif %}>Steam</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2" for="port">Port</label>
+                <input type="number" id="port" name="port" value="{{ form_values.get('port', 25565) }}"
+                    min="1024" max="65535" class="input-field">
+            </div>
+        </div>
+
+        <!-- Memory -->
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-2" for="min_memory">Min RAM (MB)</label>
+                <input type="number" id="min_memory" name="min_memory" value="{{ form_values.get('min_memory', 1024) }}"
+                    min="256" max="32768" class="input-field">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2" for="max_memory">Max RAM (MB)</label>
+                <input type="number" id="max_memory" name="max_memory" value="{{ form_values.get('max_memory', 2048) }}"
+                    min="256" max="32768" class="input-field">
+            </div>
+        </div>
+
+        <!-- Java Path -->
+        <div>
+            <label class="block text-sm font-medium mb-2" for="java_path">Java Path</label>
+            <input type="text" id="java_path" name="java_path" value="{{ form_values.get('java_path', 'java') }}"
+                class="input-field">
+        </div>
+
+        <!-- Mod Loader -->
+        <div>
+            <label class="block text-sm font-medium mb-2" for="loader">Mod Loader</label>
+            <select id="loader" name="loader" class="input-field">
+                <option value="">None / Vanilla</option>
+                <option value="fabric" {% if form_values.get('loader') == 'fabric' %}selected{% endif %}>Fabric</option>
+                <option value="paper" {% if form_values.get('loader') == 'paper' %}selected{% endif %}>Paper</option>
+                <option value="forge" {% if form_values.get('loader') == 'forge' %}selected{% endif %}>Forge</option>
+                <option value="neoforge" {% if form_values.get('loader') == 'neoforge' %}selected{% endif %}>NeoForge</option>
+                <option value="quilt" {% if form_values.get('loader') == 'quilt' %}selected{% endif %}>Quilt</option>
+            </select>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary w-full py-3">
+            Upload and Register Server
+        </button>
+
+        <!-- Progress indicator (hidden until submit) -->
+        <div id="upload-progress" class="hidden rounded-lg p-4 space-y-3" style="background: var(--clr-surface-2); border: 1px solid var(--clr-border);">
+            <div class="flex items-center gap-3">
+                <svg class="animate-spin h-5 w-5 flex-shrink-0" style="color: var(--clr-primary);" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span class="text-sm font-medium" style="color: var(--clr-text-primary);" id="progress-label">Uploading...</span>
+            </div>
+            <div class="w-full rounded-full h-2" style="background: var(--clr-border);">
+                <div id="progress-bar" class="h-2 rounded-full transition-all duration-300" style="background: var(--clr-primary); width: 0%;"></div>
+            </div>
+            <p class="text-xs" style="color: var(--clr-text-muted);">Large archives can take several minutes to upload and extract. Do not close this tab.</p>
+        </div>
+    </div>
+</form>
+
+<script nonce="{{ request.state.csp_nonce }}">
+(function () {
+    const form = document.querySelector('form[action="/servers/upload-zip"]');
+    const btn = document.getElementById('submit-btn');
+    const progress = document.getElementById('upload-progress');
+    const label = document.getElementById('progress-label');
+    const bar = document.getElementById('progress-bar');
+
+    if (!form || !btn) return;
+
+    form.addEventListener('submit', function (e) {
+        const fileInput = form.querySelector('input[type="file"]');
+        if (!fileInput || !fileInput.files.length) return;
+
+        e.preventDefault();
+
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+        progress.classList.remove('hidden');
+
+        const formData = new FormData(form);
+        const xhr = new XMLHttpRequest();
+
+        // Upload progress
+        xhr.upload.addEventListener('progress', function (ev) {
+            if (!ev.lengthComputable) return;
+            const pct = Math.round((ev.loaded / ev.total) * 100);
+            bar.style.width = pct + '%';
+            const mb = (ev.loaded / 1048576).toFixed(0);
+            const total = (ev.total / 1048576).toFixed(0);
+            label.textContent = 'Uploading... ' + mb + ' MB / ' + total + ' MB (' + pct + '%)';
+        });
+
+        // Upload complete — now server is extracting
+        xhr.upload.addEventListener('load', function () {
+            bar.style.width = '100%';
+            label.textContent = 'Extracting archive on server... please wait.';
+        });
+
+        xhr.addEventListener('load', function () {
+            if (xhr.responseURL && xhr.responseURL !== window.location.href) {
+                window.location.href = xhr.responseURL;
+            } else {
+                // Server returned an error page — reload with the response
+                document.open();
+                document.write(xhr.responseText);
+                document.close();
+            }
+        });
+
+        xhr.addEventListener('error', function () {
+            btn.disabled = false;
+            btn.textContent = 'Upload and Register Server';
+            progress.classList.add('hidden');
+            label.textContent = 'Upload failed. Please try again.';
+        });
+
+        xhr.open('POST', form.action);
+        xhr.send(formData);
+    });
+})();
+</script>
+{% endblock %}

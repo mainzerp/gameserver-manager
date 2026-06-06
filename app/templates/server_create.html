@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+{% block title %}Create Server - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">New Server</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Create New Server</h1>
+</div>
+
+<!-- Upload ZIP -->
+<div class="card mb-6 max-w-2xl">
+    <div class="card-header">Upload Server ZIP</div>
+    <div class="card-body">
+        <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">Upload a .zip archive of an existing server directory to extract and register it automatically.</p>
+        <a href="/servers/upload-zip" class="btn btn-secondary btn-sm">Upload ZIP</a>
+    </div>
+</div>
+
+<!-- Import from Config -->
+<div class="card mb-6 max-w-2xl">
+    <div class="card-header">Import from Config</div>
+    <div class="card-body">
+        <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">Import a previously exported server configuration JSON file.</p>
+        <form method="post" action="/servers/import-config" enctype="multipart/form-data" class="flex items-center gap-3">
+            {{ csrf_field(request) }}
+            <input type="file" name="file" accept=".json" class="input-field" style="width:auto;">
+            <button type="submit" class="btn btn-secondary btn-sm">Import Config</button>
+        </form>
+    </div>
+</div>
+
+<form action="/servers/create" method="post" class="max-w-2xl">
+    {{ csrf_field(request) }}
+    <div class="card p-6 space-y-6">
+
+        {% if errors %}
+        <div class="rounded-lg p-4" style="background: var(--clr-danger-bg); border: 1px solid var(--clr-danger);">
+            <ul class="list-disc list-inside text-sm space-y-1" style="color: var(--clr-danger);">
+                {% for error in errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Template Selector -->
+        {% if presets is defined and presets %}
+        <div>
+            <label class="block text-sm font-medium mb-2" for="template-select">Quick Template</label>
+            <select id="template-select"
+                class="input-field">
+                <option value="">Custom Configuration</option>
+                {% for t in presets %}
+                <option value="{{ t.id }}"
+                    data-server_type="{{ t.server_type }}"
+                    data-loader="{{ t.loader }}"
+                    data-min_memory="{{ t.min_memory }}"
+                    data-max_memory="{{ t.max_memory }}"
+                    data-steam_app_id="{{ t.steam_app_id|default('') }}"
+                    data-port="{{ t.port|default('') }}"
+                    data-description="{{ t.description }}">{{ t.name }}</option>
+                {% endfor %}
+            </select>
+            <p id="template-description" class="text-xs mt-1" style="color: var(--clr-text-muted);"></p>
+        </div>
+        {% endif %}
+
+        <!-- Node Selector -->
+        {% if nodes is defined and nodes | length > 1 %}
+        <div>
+            <label class="block text-sm font-medium mb-2" for="node_id">Node</label>
+            <select id="node_id" name="node_id"
+                class="input-field">
+                {% for n in nodes %}
+                <option value="{{ n.id }}" {% if n.is_local %}selected{% endif %}>{{ n.name }}{% if n.is_local %} (local){% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Name -->
+        <div>
+            <label class="block text-sm font-medium mb-2" for="name">Server Name</label>
+            <input type="text" id="name" name="name" required
+                minlength="1" maxlength="50" pattern="[-a-zA-Z0-9 _]+"
+                value="{{ form_values.get('name', '') }}"
+                class="input-field"
+                placeholder="My Minecraft Server">
+        </div>
+
+        <!-- Server Type -->
+        <div>
+            <label class="block text-sm font-medium mb-2" for="server_type">Server Type</label>
+            <select id="server_type" name="server_type"
+                class="input-field">
+                {% for t in server_types %}
+                <option value="{{ t }}" {% if form_values.get('server_type') == t %}selected{% endif %}>{{ t | replace("_", " ") | title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Minecraft fields -->
+        <div id="mc-fields">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2" for="mc_version">MC Version</label>
+                    <select id="mc_version" name="mc_version" class="input-field">
+                        <option value="">Loading versions...</option>
+                    </select>
+                </div>
+                <div class="java-only-field">
+                    <label class="block text-sm font-medium mb-2" for="loader">Mod Loader</label>
+                    <select id="loader" name="loader"
+                        class="input-field">
+                        <option value="" {% if not form_values.get('loader') %}selected{% endif %}>Vanilla</option>
+                        <option value="fabric" {% if form_values.get('loader') == 'fabric' %}selected{% endif %}>Fabric</option>
+                        <option value="paper" {% if form_values.get('loader') == 'paper' %}selected{% endif %}>Paper</option>
+                        <option value="forge" {% if form_values.get('loader') == 'forge' %}selected{% endif %}>Forge</option>
+                        <option value="neoforge" {% if form_values.get('loader') == 'neoforge' %}selected{% endif %}>NeoForge</option>
+                        <option value="quilt" {% if form_values.get('loader') == 'quilt' %}selected{% endif %}>Quilt</option>
+                    </select>
+                    <p class="text-xs mt-1" style="color: var(--clr-text-muted);">All loaders are downloaded automatically.</p>
+                </div>
+            </div>
+
+            <div id="loader-version-group" class="hidden mt-4 java-only-field">
+                <label class="block text-sm font-medium mb-2" for="loader_version">Loader Version</label>
+                <select id="loader_version" name="loader_version" class="input-field">
+                    <option value="">Latest (recommended)</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-4 java-only-field">
+                <div>
+                    <label class="block text-sm font-medium mb-2" for="min_memory">Min RAM (MB)</label>
+                    <input type="number" id="min_memory" name="min_memory" value="{{ form_values.get('min_memory', 1024) }}"
+                        min="256" max="32768"
+                        class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2" for="max_memory">Max RAM (MB)</label>
+                    <input type="number" id="max_memory" name="max_memory" value="{{ form_values.get('max_memory', 2048) }}"
+                        min="256" max="32768"
+                        class="input-field">
+                </div>
+            </div>
+
+            <div class="mt-4 java-only-field">
+                <label class="block text-sm font-medium mb-2" for="java_path">Java Path</label>
+                <input type="text" id="java_path" name="java_path" value="{{ form_values.get('java_path', 'java') }}"
+                    class="input-field" readonly
+                    style="cursor: default; opacity: 0.7;">
+                <p class="text-xs mt-1" style="color: var(--clr-text-muted);" id="java-hint">
+                    Automatically detected on the server based on MC version.
+                </p>
+                <div id="java-version-info" class="mt-2 text-xs hidden">
+                    <span class="px-2 py-1 rounded" style="background: var(--clr-bg-tertiary); color: var(--clr-accent);"></span>
+                </div>
+            </div>
+
+            <!-- RCON Settings -->
+            <div class="mt-4 border-t pt-4">
+                <div class="flex items-center gap-3 mb-3">
+                    <input type="checkbox" id="rcon_enabled" name="rcon_enabled" value="true"
+                        {% if form_values.get('rcon_enabled') %}checked{% endif %}
+                        class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500"
+                        >
+                    <label class="text-sm font-medium" for="rcon_enabled">Enable RCON</label>
+                </div>
+                <div id="rcon-fields" class="hidden grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="rcon_port">RCON Port</label>
+                        <input type="number" id="rcon_port" name="rcon_port" value="{{ form_values.get('rcon_port', 25575) }}"
+                            min="1024" max="65535"
+                            class="input-field">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="rcon_password">RCON Password</label>
+                        <input type="password" id="rcon_password" name="rcon_password" value="{{ form_values.get('rcon_password', '') }}"
+                            class="input-field">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server Properties -->
+            <div class="mt-4 border-t pt-4">
+                <button type="button" id="server-props-toggle" class="flex items-center gap-2 text-sm font-medium w-full text-left" style="color: var(--clr-text-primary);">
+                    <svg id="server-props-arrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Server Properties
+                    <span class="text-xs font-normal" style="color: var(--clr-text-muted);">(optional)</span>
+                </button>
+                <div id="server-props-fields" class="hidden mt-4 space-y-4">
+                    <!-- MOTD -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="motd">MOTD</label>
+                        <input type="text" id="motd" name="motd"
+                            value="{{ form_values.get('motd', 'A Minecraft Server') }}"
+                            class="input-field"
+                            placeholder="A Minecraft Server">
+                        <p class="text-xs mt-1" style="color: var(--clr-text-muted);">Message displayed in the server list</p>
+                    </div>
+
+                    <!-- Level Seed -->
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="level_seed">Level Seed</label>
+                        <input type="text" id="level_seed" name="level_seed"
+                            value="{{ form_values.get('level_seed', '') }}"
+                            class="input-field"
+                            placeholder="Leave empty for random">
+                        <p class="text-xs mt-1" style="color: var(--clr-text-muted);">Leave empty for random seed</p>
+                    </div>
+
+                    <!-- Difficulty + Gamemode -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2" for="difficulty">Difficulty</label>
+                            <select id="difficulty" name="difficulty" class="input-field">
+                                <option value="peaceful" {% if form_values.get('difficulty', 'easy') == 'peaceful' %}selected{% endif %}>Peaceful</option>
+                                <option value="easy" {% if form_values.get('difficulty', 'easy') == 'easy' %}selected{% endif %}>Easy</option>
+                                <option value="normal" {% if form_values.get('difficulty', 'easy') == 'normal' %}selected{% endif %}>Normal</option>
+                                <option value="hard" {% if form_values.get('difficulty', 'easy') == 'hard' %}selected{% endif %}>Hard</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2" for="gamemode">Gamemode</label>
+                            <select id="gamemode" name="gamemode" class="input-field">
+                                <option value="survival" {% if form_values.get('gamemode', 'survival') == 'survival' %}selected{% endif %}>Survival</option>
+                                <option value="creative" {% if form_values.get('gamemode', 'survival') == 'creative' %}selected{% endif %}>Creative</option>
+                                <option value="adventure" {% if form_values.get('gamemode', 'survival') == 'adventure' %}selected{% endif %}>Adventure</option>
+                                <option value="spectator" {% if form_values.get('gamemode', 'survival') == 'spectator' %}selected{% endif %}>Spectator</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Max Players + View Distance -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2" for="max_players">Max Players</label>
+                            <input type="number" id="max_players" name="max_players"
+                                value="{{ form_values.get('max_players', 20) }}"
+                                min="1" max="1000"
+                                class="input-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2" for="view_distance">View Distance</label>
+                            <input type="number" id="view_distance" name="view_distance"
+                                value="{{ form_values.get('view_distance', 10) }}"
+                                min="2" max="32"
+                                class="input-field">
+                        </div>
+                    </div>
+
+                    <!-- Spawn Protection + Level Type -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2" for="spawn_protection">Spawn Protection</label>
+                            <input type="number" id="spawn_protection" name="spawn_protection"
+                                value="{{ form_values.get('spawn_protection', 16) }}"
+                                min="0" max="256"
+                                class="input-field">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2" for="level_type">Level Type</label>
+                            <select id="level_type" name="level_type" class="input-field">
+                                <option value="minecraft\:normal" {% if form_values.get('level_type', 'minecraft\\:normal') == 'minecraft\\:normal' %}selected{% endif %}>Normal</option>
+                                <option value="minecraft\:flat" {% if form_values.get('level_type', 'minecraft\\:normal') == 'minecraft\\:flat' %}selected{% endif %}>Flat</option>
+                                <option value="minecraft\:amplified" {% if form_values.get('level_type', 'minecraft\\:normal') == 'minecraft\\:amplified' %}selected{% endif %}>Amplified</option>
+                                <option value="minecraft\:large_biomes" {% if form_values.get('level_type', 'minecraft\\:normal') == 'minecraft\\:large_biomes' %}selected{% endif %}>Large Biomes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Toggles Row -->
+                    <div class="flex flex-wrap gap-6">
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" name="white_list" value="true"
+                                {% if form_values.get('white_list', False) %}checked{% endif %}
+                                class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
+                            White List
+                        </label>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="hidden" name="pvp" value="false">
+                            <input type="checkbox" name="pvp" value="true"
+                                {% if form_values.get('pvp', True) %}checked{% endif %}
+                                class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
+                            PvP
+                        </label>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="hidden" name="online_mode" value="false">
+                            <input type="checkbox" name="online_mode" value="true"
+                                {% if form_values.get('online_mode', True) %}checked{% endif %}
+                                class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
+                            Online Mode
+                        </label>
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="hidden" name="allow_nether" value="false">
+                            <input type="checkbox" name="allow_nether" value="true"
+                                {% if form_values.get('allow_nether', True) %}checked{% endif %}
+                                class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
+                            Allow Nether
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Steam fields -->
+        <div id="steam-fields" class="hidden">
+            <div>
+                <label class="block text-sm font-medium mb-2" for="steam_app_id">Steam App ID</label>
+                <select id="steam_app_id" name="steam_app_id"
+                    class="input-field">
+                    <option value="">Custom...</option>
+                    {% for key, app in steam_apps.items() %}
+                    <option value="{{ app.app_id }}" data-port="{{ app.default_port }}">{{ app.name }} ({{ app.app_id }})</option>
+                    {% endfor %}
+                </select>
+                {% if not steamcmd_available %}
+                <div class="mt-2 p-3 rounded-lg" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+                    <p class="text-xs" style="color: var(--clr-warning);">SteamCMD is not installed. Steam servers cannot be installed automatically.</p>
+                    <form method="post" action="/settings/steamcmd/install" class="mt-2 inline">
+                        {{ csrf_field(request) }}
+                        <button type="submit" class="btn btn-warning btn-sm">Install SteamCMD</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="mt-4">
+                <label class="block text-sm font-medium mb-2" for="steam_branch">Steam Branch</label>
+                <input type="text" id="steam_branch" name="steam_branch" value="{{ form_values.get('steam_branch', 'public') }}"
+                    class="input-field" placeholder="public">
+                <p class="text-xs mt-1" style="color: var(--clr-text-muted);">Usually "public". Use beta branch names for testing builds.</p>
+            </div>
+
+            <div class="mt-4 flex items-center gap-3">
+                <input type="hidden" name="steam_login_anonymous" value="false">
+                <input type="checkbox" id="steam_login_anonymous" name="steam_login_anonymous" value="true"
+                    {% if form_values.get('steam_login_anonymous', True) %}checked{% endif %}
+                    class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
+                <label class="text-sm font-medium" for="steam_login_anonymous">Anonymous Login</label>
+                <p class="text-xs" style="color: var(--clr-text-muted);">(sufficient for most game servers)</p>
+            </div>
+
+            <div class="mt-4" id="steam_account_section" style="display: none;">
+                <label class="block text-sm font-medium mb-2" for="steam_account_id">Steam Account</label>
+                <select id="steam_account_id" name="steam_account_id" class="input-field">
+                    <option value="">-- Select Steam Account --</option>
+                    {% for account in steam_accounts|default([]) %}
+                    <option value="{{ account.id }}" {% if form_values.get('steam_account_id') == account.id|string %}selected{% endif %}>
+                        {{ account.display_name }} ({{ account.username }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs mt-1" style="color: var(--clr-text-muted);">Required for games that need authenticated login. Manage accounts in Site Settings.</p>
+            </div>
+
+            <div class="mt-4 flex items-center gap-3">
+                <input type="hidden" name="steam_update_on_start" value="false">
+                <input type="checkbox" id="steam_update_on_start" name="steam_update_on_start" value="true"
+                    {% if form_values.get('steam_update_on_start', False) %}checked{% endif %}
+                    class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
+                <label class="text-sm font-medium" for="steam_update_on_start">Update on Start</label>
+                <p class="text-xs" style="color: var(--clr-text-muted);">Run SteamCMD update before every server start</p>
+            </div>
+        </div>
+
+        <!-- Port -->
+        <div>
+            <label class="block text-sm font-medium mb-2" for="port">Port</label>
+            <input type="number" id="port" name="port" value="{{ form_values.get('port', suggested_game_port|default(25565)) }}"
+                min="1024" max="65535"
+                class="input-field">
+            <p id="port-warning" class="text-yellow-400 text-xs mt-1 hidden"></p>
+        </div>
+
+        <!-- Auto-start -->
+        <div class="flex items-center gap-3">
+            <input type="checkbox" id="auto_start" name="auto_start" value="true"
+                {% if form_values.get('auto_start') %}checked{% endif %}
+                class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
+            <label class="text-sm font-medium" for="auto_start">Auto-start on panel boot</label>
+        </div>
+
+        <button type="submit"
+            class="btn btn-primary w-full py-3">
+            Create Server
+        </button>
+    </div>
+</form>
+
+<script nonce="{{ request.state.csp_nonce }}">
+function toggleRcon() {
+    const enabled = document.getElementById('rcon_enabled').checked;
+    document.getElementById('rcon-fields').classList.toggle('hidden', !enabled);
+}
+toggleRcon();
+
+function toggleServerProps() {
+    const fields = document.getElementById('server-props-fields');
+    const arrow = document.getElementById('server-props-arrow');
+    fields.classList.toggle('hidden');
+    arrow.classList.toggle('rotate-90');
+}
+
+function toggleFields() {
+    const type = document.getElementById('server_type').value;
+    const mcFields = document.getElementById('mc-fields');
+    const steamFields = document.getElementById('steam-fields');
+    const javaOnlyFields = document.querySelectorAll('.java-only-field');
+
+    if (type === 'steam') {
+        mcFields.classList.add('hidden');
+        steamFields.classList.remove('hidden');
+        // Set port from selected steam app or default 27015
+        onSteamAppChange();
+    } else {
+        mcFields.classList.remove('hidden');
+        steamFields.classList.add('hidden');
+        document.getElementById('port').value = type === 'minecraft_bedrock' ? '19132' : '25565';
+    }
+
+    // Hide Java-specific fields for Bedrock
+    javaOnlyFields.forEach(function(el) {
+        if (type === 'minecraft_bedrock') {
+            el.classList.add('hidden');
+        } else {
+            el.classList.remove('hidden');
+        }
+    });
+}
+
+function onSteamAppChange() {
+    var select = document.getElementById('steam_app_id');
+    var opt = select.options[select.selectedIndex];
+    var port = opt.getAttribute('data-port');
+    if (port) {
+        document.getElementById('port').value = port;
+    } else {
+        document.getElementById('port').value = '27015';
+    }
+}
+
+/* ---- MC Version dropdown ---- */
+async function loadMcVersions() {
+    const select = document.getElementById('mc_version');
+    try {
+        const resp = await fetch('/api/v1/versions/minecraft');
+        if (!resp.ok) throw new Error('fetch failed');
+        const json = await resp.json();
+        const versions = json.data.versions;
+        const latest = json.data.latest;
+
+        select.innerHTML = '';
+        versions.forEach(function(v) {
+            var opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v + (v === latest ? ' (latest)' : '');
+            if (v === latest) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        var savedVersion = '{{ form_values.get("mc_version", "") }}';
+        if (savedVersion) {
+            select.value = savedVersion;
+        }
+
+        onMcVersionChange();
+    } catch (e) {
+        select.outerHTML = '<input type="text" id="mc_version" name="mc_version" ' +
+            'class="input-field" placeholder="1.21.4" ' +
+            'value="{{ form_values.get("mc_version", "") }}">';
+        var newMcEl = document.getElementById('mc_version');
+        if (newMcEl) { newMcEl.addEventListener('change', onMcVersionChange); }
+        onMcVersionChange();
+    }
+}
+
+function onMcVersionChange() {
+    updateJavaInfo();
+    loadLoaderVersions();
+}
+
+/* ---- Loader version dropdown ---- */
+function onLoaderChange() {
+    loadLoaderVersions();
+}
+
+async function loadLoaderVersions() {
+    var loader = document.getElementById('loader').value;
+    var mcVersion = document.getElementById('mc_version').value;
+    var group = document.getElementById('loader-version-group');
+    var select = document.getElementById('loader_version');
+
+    if (!loader || loader === 'vanilla' || !mcVersion) {
+        group.classList.add('hidden');
+        select.innerHTML = '<option value="">Latest (recommended)</option>';
+        return;
+    }
+
+    group.classList.remove('hidden');
+    select.innerHTML = '<option value="">Loading...</option>';
+
+    try {
+        var resp = await fetch('/api/v1/versions/loader?loader=' + encodeURIComponent(loader) + '&mc_version=' + encodeURIComponent(mcVersion));
+        if (!resp.ok) throw new Error('fetch failed');
+        var json = await resp.json();
+        var versions = json.data.versions;
+
+        select.innerHTML = '<option value="">Latest (recommended)</option>';
+        versions.forEach(function(v) {
+            var opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            select.appendChild(opt);
+        });
+
+        var savedLoaderVersion = '{{ form_values.get("loader_version", "") }}';
+        if (savedLoaderVersion) {
+            select.value = savedLoaderVersion;
+        }
+    } catch (e) {
+        select.innerHTML = '<option value="">Latest (recommended)</option>';
+    }
+}
+
+/* ---- Java version info ---- */
+var javaInfo = document.getElementById('java-version-info');
+
+async function updateJavaInfo() {
+    var mcSelect = document.getElementById('mc_version');
+    var ver = mcSelect.value ? mcSelect.value.trim() : '';
+    if (!ver) {
+        javaInfo.classList.add('hidden');
+        return;
+    }
+    try {
+        var resp = await fetch('/api/v1/versions/java-info?mc_version=' + encodeURIComponent(ver));
+        if (!resp.ok) throw new Error('fetch failed');
+        var json = await resp.json();
+        var label = json.data.label || 'Unknown';
+        javaInfo.classList.remove('hidden');
+        javaInfo.querySelector('span').textContent = 'MC ' + ver + ' requires ' + label + ' (automatically detected)';
+    } catch (e) {
+        var parts = ver.split('.').map(Number);
+        var major = parts[0] || 1;
+        var minor = parts[1] || 0;
+        var patch = parts[2] || 0;
+        var javaVer = 8;
+        if (major >= 1 && minor >= 20 && patch >= 5) javaVer = 21;
+        else if (major >= 1 && minor >= 18) javaVer = 17;
+        else if (major >= 1 && minor >= 17) javaVer = 16;
+        javaInfo.classList.remove('hidden');
+        javaInfo.querySelector('span').textContent = 'MC ' + ver + ' requires Java ' + javaVer + '+ (automatically detected)';
+    }
+}
+
+// Dynamic port suggestion when server type changes
+const serverTypeSelect = document.getElementById('server_type');
+const portInput = document.getElementById('port');
+const portWarning = document.getElementById('port-warning');
+
+async function fetchSuggestedPorts() {
+    const serverType = serverTypeSelect.value;
+    try {
+        const resp = await fetch(`/api/v1/servers/suggest-ports?server_type=${encodeURIComponent(serverType)}`);
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.data) {
+                portInput.value = data.data.game_port;
+                const rconPortInput = document.getElementById('rcon_port');
+                if (rconPortInput && data.data.rcon_port) {
+                    rconPortInput.value = data.data.rcon_port;
+                }
+            }
+        }
+    } catch (e) { /* ignore fetch errors */ }
+}
+
+async function checkPortConflicts() {
+    const port = portInput.value;
+    if (!port) return;
+    try {
+        const resp = await fetch(`/api/v1/servers/suggest-ports?server_type=${serverTypeSelect.value}`);
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.data && data.data.conflicts && data.data.conflicts.length > 0) {
+                portWarning.textContent = data.data.conflicts.join('; ');
+                portWarning.classList.remove('hidden');
+            } else {
+                portWarning.classList.add('hidden');
+            }
+        }
+    } catch (e) { /* ignore */ }
+}
+
+serverTypeSelect.addEventListener('change', fetchSuggestedPorts);
+portInput.addEventListener('blur', checkPortConflicts);
+
+function applyTemplate(select) {
+    var opt = select.options[select.selectedIndex];
+    var desc = document.getElementById('template-description');
+    if (!opt.value) {
+        if (desc) desc.textContent = '';
+        return;
+    }
+    var serverType = opt.getAttribute('data-server_type') || '';
+    var loader = opt.getAttribute('data-loader') || '';
+    var minMem = opt.getAttribute('data-min_memory') || '';
+    var maxMem = opt.getAttribute('data-max_memory') || '';
+    var descText = opt.getAttribute('data-description') || '';
+    var steamAppId = opt.getAttribute('data-steam_app_id') || '';
+    var port = opt.getAttribute('data-port') || '';
+
+    if (desc) desc.textContent = descText;
+
+    var stEl = document.getElementById('server_type');
+    if (stEl && serverType) { stEl.value = serverType; toggleFields(); }
+    var loaderEl = document.getElementById('loader');
+    if (loaderEl) { loaderEl.value = loader; onLoaderChange(); }
+    var minEl = document.getElementById('min_memory');
+    if (minEl && minMem) minEl.value = minMem;
+    var maxEl = document.getElementById('max_memory');
+    if (maxEl && maxMem) maxEl.value = maxMem;
+
+    // Apply Steam template fields
+    if (steamAppId) {
+        var steamSelect = document.getElementById('steam_app_id');
+        if (steamSelect) {
+            steamSelect.value = steamAppId;
+            onSteamAppChange();
+        }
+    }
+    if (port) {
+        document.getElementById('port').value = port;
+    }
+
+    var mcSelect = document.getElementById('mc_version');
+    if (mcSelect && mcSelect.tagName === 'SELECT') {
+        onMcVersionChange();
+    }
+}
+
+function toggleSteamAccountSection() {
+    var anonCheckbox = document.getElementById('steam_login_anonymous');
+    var accountSection = document.getElementById('steam_account_section');
+    if (anonCheckbox && accountSection) {
+        accountSection.style.display = anonCheckbox.checked ? 'none' : 'block';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadMcVersions();
+    toggleFields();
+    toggleRcon();
+    toggleSteamAccountSection();
+
+    // Attach event listeners (CSP-compliant, no inline handlers)
+    var serverTypeEl = document.getElementById('server_type');
+    if (serverTypeEl) { serverTypeEl.addEventListener('change', toggleFields); }
+
+    var templateEl = document.getElementById('template-select');
+    if (templateEl) { templateEl.addEventListener('change', function() { applyTemplate(this); }); }
+
+    var mcVersionEl = document.getElementById('mc_version');
+    if (mcVersionEl) { mcVersionEl.addEventListener('change', onMcVersionChange); }
+
+    var loaderEl = document.getElementById('loader');
+    if (loaderEl) { loaderEl.addEventListener('change', onLoaderChange); }
+
+    var rconEl = document.getElementById('rcon_enabled');
+    if (rconEl) { rconEl.addEventListener('change', toggleRcon); }
+
+    var propsBtn = document.getElementById('server-props-toggle');
+    if (propsBtn) { propsBtn.addEventListener('click', toggleServerProps); }
+
+    var steamAppEl = document.getElementById('steam_app_id');
+    if (steamAppEl) { steamAppEl.addEventListener('change', onSteamAppChange); }
+
+    var anonCb = document.getElementById('steam_login_anonymous');
+    if (anonCb) { anonCb.addEventListener('change', toggleSteamAccountSection); }
+});
+</script>
+{% endblock %}

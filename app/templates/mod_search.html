@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Search Mods - {{ server.name }}{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/{{ server.id }}" style="color: var(--clr-text-muted);" class="hover:underline">{{ server.name }}</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<a href="/servers/{{ server.id }}/mods" style="color: var(--clr-text-muted);" class="hover:underline">Mods</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Search</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Search Mods</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">Search for mods and plugins for your server</p>
+</div>
+
+<!-- Source Tabs -->
+<div class="tab-nav mb-4">
+    <a href="/servers/{{ server.id }}/mods/search?source=modrinth{% if query %}&q={{ query }}{% endif %}"
+       class="tab-btn tab-btn-active">
+        Modrinth
+    </a>
+</div>
+
+<form action="/servers/{{ server.id }}/mods/search" method="get" class="mb-8">
+    <input type="hidden" name="source" value="{{ source|default('modrinth') }}">
+    <div class="flex gap-3">
+        <input type="text" name="q" value="{{ query }}" placeholder="Search mods (e.g. 'sodium', 'fabric api')..."
+            class="input-field flex-1 py-3"
+            autofocus>
+        <button type="submit" class="btn btn-primary px-6 py-3">
+            Search
+        </button>
+    </div>
+</form>
+
+{% if results %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for mod in results %}
+    <div class="card p-5">
+        <div class="flex items-start gap-4">
+            {% if mod.icon_url %}
+            <img src="{{ mod.icon_url }}" alt="" class="w-12 h-12 rounded-lg flex-shrink-0">
+            {% else %}
+            <div class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style="background: var(--clr-input);">
+                <svg class="w-6 h-6" style="color: var(--clr-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+            </div>
+            {% endif %}
+            <div class="flex-1 min-w-0">
+                <h3 class="font-semibold truncate" style="color: var(--clr-text-primary);">{{ mod.title }}</h3>
+                <p class="text-xs mt-0.5" style="color: var(--clr-text-muted);">by {{ mod.author }}</p>
+                <p class="text-sm mt-2 line-clamp-2" style="color: var(--clr-text-secondary);">{{ mod.description }}</p>
+                <div class="flex items-center gap-4 mt-3 text-xs" style="color: var(--clr-text-muted);">
+                    <span>{{ mod.downloads | default(0) }} Downloads</span>
+                    <span>{{ mod.categories | join(', ') }}</span>
+                </div>
+            </div>
+        </div>
+        <form action="/servers/{{ server.id }}/mods/install" method="post" class="mt-4">
+            {{ csrf_field(request) }}
+            <input type="hidden" name="project_id" value="{{ mod.project_id }}">
+            <input type="hidden" name="source" value="{{ source|default('modrinth') }}">
+            <button type="submit"
+                class="btn w-full py-2 text-sm font-medium" style="background: var(--clr-success); color: #ffffff;">
+                Install
+            </button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+{% elif query %}
+<div class="card p-12 text-center">
+    <p style="color: var(--clr-text-secondary);">No results for "{{ query }}".</p>
+</div>
+{% endif %}
+{% endblock %}

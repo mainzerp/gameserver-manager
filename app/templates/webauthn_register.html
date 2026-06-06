@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Passkeys - GameServer Manager{% endblock %}
+
+{% block breadcrumb %}
+<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Dashboard</a>
+<span style="color: var(--clr-text-muted);"> / </span>
+<span style="color: var(--clr-text-primary);">Passkeys</span>
+{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Passkeys</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">Manage your WebAuthn / passkey credentials for passwordless sign-in</p>
+</div>
+
+{% if not webauthn_available %}
+<div class="rounded-xl p-4 mb-6" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+    <p class="font-medium" style="color: var(--clr-warning);">WebAuthn is not available</p>
+    <p class="text-sm mt-1" style="color: var(--clr-warning); opacity: 0.8;">
+        Install <code class="px-1 rounded" style="background: var(--console-bg);">py-webauthn</code> and set
+        <code class="px-1 rounded" style="background: var(--console-bg);">GSM_WEBAUTHN_ENABLED=true</code> to enable passkeys.
+    </p>
+</div>
+{% else %}
+
+{% if flash %}
+<div class="text-sm rounded-xl px-4 py-3 mb-4" style="background: var(--clr-success-bg); border: 1px solid var(--clr-success); color: var(--clr-success);">
+    {{ flash }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="text-sm rounded-xl px-4 py-3 mb-4" style="background: var(--clr-danger-bg); border: 1px solid var(--clr-danger); color: var(--clr-danger);">
+    {{ error }}
+</div>
+{% endif %}
+
+<!-- Existing Credentials -->
+<div class="card p-6 mb-6">
+    <h2 class="text-lg font-semibold mb-4">Registered Passkeys</h2>
+    {% if credentials %}
+    <div class="space-y-2">
+        {% for cred in credentials %}
+        <div class="flex items-center justify-between py-2 last:border-0" style="border-bottom: 1px solid var(--clr-border);">
+            <div>
+                <p class="font-medium text-sm">{{ cred.name }}</p>
+                <p class="text-xs" style="color: var(--clr-text-muted);">Registered {{ cred.created_at.strftime('%Y-%m-%d') if cred.created_at else 'unknown' }}</p>
+            </div>
+            <form action="/auth/webauthn/credentials/{{ cred.id }}/delete" method="post" class="inline"
+                  data-confirm='Remove this passkey?'>
+                {{ csrf_field(request) }}
+                <button type="submit"
+                    class="text-sm transition" style="color: var(--clr-danger);">
+                    Remove
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm" style="color: var(--clr-text-muted);">No passkeys registered yet.</p>
+    {% endif %}
+</div>
+
+<!-- Register New Passkey -->
+<div class="card p-6">
+    <h2 class="text-lg font-semibold mb-2">Register New Passkey</h2>
+    <p class="text-sm mb-4" style="color: var(--clr-text-secondary);">
+        Use your device's biometrics, security key, or PIN to register a passkey for faster sign-in.
+    </p>
+    <div class="flex items-center gap-3">
+        <input type="text" id="passkey-name" placeholder="Passkey name (e.g. MacBook Touch ID)"
+            class="input-field w-64">
+        <button id="register-btn" data-action="registerPasskey"
+            class="btn btn-primary">
+            Register Passkey
+        </button>
+    </div>
+    <p id="register-status" class="text-sm mt-3 hidden"></p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if webauthn_available %}
+<script nonce="{{ request.state.csp_nonce }}">
+async function registerPasskey() {
+    const nameInput = document.getElementById('passkey-name');
+    const status = document.getElementById('register-status');
+    const btn = document.getElementById('register-btn');
+    const name = nameInput.value.trim() || 'Passkey';
+
+    btn.disabled = true;
+    status.style.color = 'var(--clr-text-secondary)';
+    status.textContent = 'Requesting registration options...';
+    status.classList.remove('hidden');
+
+    try {
+        const optResp = await fetch('/auth/webauthn/register/options', {method: 'POST'});
+        if (!optResp.ok) { throw new Error('Failed to get registration options'); }
+        const options = await optResp.json();
+
+        options.challenge = base64urlToBuffer(options.challenge);
+        options.user.id = base64urlToBuffer(options.user.id);
+        if (options.excludeCredentials) {
+            options.excludeCredentials = options.excludeCredentials.map(c => ({
+                ...c, id: base64urlToBuffer(c.id)
+            }));
+        }
+
+        status.textContent = 'Please complete the passkey gesture on your device...';
+        const credential = await navigator.credentials.create({publicKey: options});
+
+        const payload = {
+            name: name,
+            id: credential.id,
+            rawId: bufferToBase64url(credential.rawId),
+            type: credential.type,
+            response: {
+                clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                attestationObject: bufferToBase64url(credential.response.attestationObject),
+            }
+        };
+
+        const verResp = await fetch('/auth/webauthn/register/complete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        const result = await verResp.json();
+        if (result.ok) {
+            status.style.color = 'var(--clr-success)';
+            status.textContent = 'Passkey registered successfully!';
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            status.style.color = 'var(--clr-danger)';
+            status.textContent = 'Registration failed: ' + (result.error || 'Unknown error');
+        }
+    } catch (e) {
+        status.style.color = 'var(--clr-danger)';
+        status.textContent = 'Error: ' + e.message;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+function base64urlToBuffer(base64url) {
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(base64);
+    const buffer = new ArrayBuffer(binary.length);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < binary.length; i++) { view[i] = binary.charCodeAt(i); }
+    return buffer;
+}
+
+function bufferToBase64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let b of bytes) { binary += String.fromCharCode(b); }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+</script>
+{% endif %}
+{% endblock %}

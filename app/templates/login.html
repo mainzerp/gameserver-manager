@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - GameServer Manager</title>
+    <script nonce="{{ request.state.csp_nonce }}">
+        (function(){
+            var t = localStorage.getItem('gsm_theme');
+            if (t === 'light') document.documentElement.classList.remove('dark');
+        })();
+    </script>
+    <!-- Self-hosted fonts -->
+    <link rel="stylesheet" href="/static/css/fonts.css">
+    <!-- Tailwind CSS (compiled) -->
+    <link rel="stylesheet" href="/static/css/tailwind.css">
+    <style>
+        :root {
+            --clr-bg: #f1f5f9;
+            --clr-panel: #ffffff;
+            --clr-input: #f8fafc;
+            --clr-border: #e2e8f0;
+            --clr-border-hover: #6366f1;
+            --clr-text-primary: #0f172a;
+            --clr-text-secondary: #475569;
+            --clr-text-muted: #94a3b8;
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #4f46e5;
+            --clr-danger: #dc2626;
+            --clr-danger-bg: rgba(220,38,38,0.1);
+            --transition-fast: 150ms ease;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+        }
+        html.dark {
+            --clr-bg: #0c0c1d;
+            --clr-panel: #151530;
+            --clr-input: #0f0f23;
+            --clr-border: #252547;
+            --clr-border-hover: #6366f1;
+            --clr-text-primary: #e2e8f0;
+            --clr-text-secondary: #94a3b8;
+            --clr-text-muted: #64748b;
+            --clr-accent: #6366f1;
+            --clr-accent-hover: #818cf8;
+            --clr-danger: #ef4444;
+            --clr-danger-bg: rgba(239,68,68,0.12);
+            --transition-fast: 150ms ease;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            color: var(--clr-text-primary);
+            background: linear-gradient(135deg, var(--clr-bg) 0%, var(--clr-panel) 50%, var(--clr-bg) 100%);
+        }
+        * { transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast); }
+        .card {
+            background: var(--clr-panel);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-md);
+        }
+        .input-field {
+            background: var(--clr-input);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            font-size: 14px;
+            color: var(--clr-text-primary);
+            outline: none;
+            width: 100%;
+            transition: border-color var(--transition-fast);
+        }
+        .input-field:focus { border-color: var(--clr-accent); }
+        .input-field::placeholder { color: var(--clr-text-muted); }
+        .btn-primary {
+            background: var(--clr-accent);
+            color: #ffffff;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all var(--transition-fast);
+        }
+        .btn-primary:hover { background: var(--clr-accent-hover); }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--clr-border);
+            color: var(--clr-text-secondary);
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        .btn-secondary:hover { border-color: var(--clr-accent); color: var(--clr-text-primary); }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+            <svg class="w-12 h-12 mx-auto mb-3" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+            </svg>
+            <h1 class="text-2xl font-bold" style="color: var(--clr-accent);">GameServer Manager</h1>
+        </div>
+
+        <div class="card p-6">
+            {% if error %}
+            <div class="text-sm rounded-lg px-4 py-3 mb-4" style="background: var(--clr-danger-bg); color: var(--clr-danger);">
+                {% if error == "invalid" %}
+                {{ _("Invalid username or password.") }}
+                {% else %}
+                {{ error }}
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <form action="/login" method="post" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="username">{{ _("Username") }}</label>
+                    <input type="text" id="username" name="username" required autofocus
+                        class="input-field">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="password">{{ _("Password") }}</label>
+                    <input type="password" id="password" name="password" required
+                        class="input-field">
+                </div>
+                <button type="submit" class="btn-primary w-full">
+                    {{ _("Sign In") }}
+                </button>
+            </form>
+
+            {% if webauthn_available %}
+            <div class="mt-4 pt-4" style="border-top: 1px solid var(--clr-border);">
+                <button id="passkey-btn" data-action="loginWithPasskey"
+                    class="btn-secondary w-full flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                    </svg>
+                    Sign in with Passkey
+                </button>
+                <p id="passkey-status" class="text-xs text-center mt-2 hidden" style="color: var(--clr-text-muted);"></p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+
+{% if webauthn_available %}
+<script nonce="{{ request.state.csp_nonce }}">
+async function loginWithPasskey() {
+    const btn = document.getElementById('passkey-btn');
+    const status = document.getElementById('passkey-status');
+    btn.disabled = true;
+    status.textContent = 'Requesting options...';
+    status.classList.remove('hidden');
+    try {
+        const optResp = await fetch('/auth/webauthn/login/options');
+        if (!optResp.ok) { throw new Error('Failed to get options'); }
+        const options = await optResp.json();
+        options.challenge = base64urlToBuffer(options.challenge);
+        if (options.allowCredentials) {
+            options.allowCredentials = options.allowCredentials.map(c => ({
+                ...c, id: base64urlToBuffer(c.id)
+            }));
+        }
+        status.textContent = 'Please complete the passkey gesture...';
+        const assertion = await navigator.credentials.get({publicKey: options});
+        const payload = {
+            id: assertion.id,
+            rawId: bufferToBase64url(assertion.rawId),
+            type: assertion.type,
+            response: {
+                clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON),
+                authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
+                signature: bufferToBase64url(assertion.response.signature),
+                userHandle: assertion.response.userHandle ? bufferToBase64url(assertion.response.userHandle) : null,
+            }
+        };
+        const verResp = await fetch('/auth/webauthn/login/complete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        const result = await verResp.json();
+        if (result.ok) {
+            window.location.href = result.redirect || '/';
+        } else {
+            status.textContent = 'Authentication failed: ' + (result.error || 'Unknown error');
+            btn.disabled = false;
+        }
+    } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+        btn.disabled = false;
+    }
+}
+function base64urlToBuffer(b) {
+    const s = b.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(s);
+    const buf = new ArrayBuffer(bin.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+    return buf;
+}
+function bufferToBase64url(buf) {
+    const bytes = new Uint8Array(buf);
+    let s = '';
+    for (let b of bytes) s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+</script>
+{% endif %}
+</html>
