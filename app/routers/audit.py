@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.services.audit_service import audit_service
-from app.services.auth import get_current_user, get_current_user_dep, require_role
+from app.services.auth import get_current_user_dep, require_role
 from app.template_utils import templates
 
 router = APIRouter(dependencies=[Depends(get_current_user_dep)])

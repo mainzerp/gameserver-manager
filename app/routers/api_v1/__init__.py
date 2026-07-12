@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
-from app.routers.api_v1.servers import router as servers_router
 from app.routers.api_v1.backups import router as backups_router
 from app.routers.api_v1.schedules import router as schedules_router
+from app.routers.api_v1.servers import router as servers_router
 from app.routers.api_v1.system import router as system_router
 from app.routers.api_v1.versions import router as versions_router
 

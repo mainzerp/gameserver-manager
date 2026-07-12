@@ -191,8 +191,6 @@
 
 ---
 
-## Previous Version: 2.2.0
-
 ### v2.2.0 -- Production Readiness
 
 **Security:**
@@ -211,7 +209,6 @@
 - Docker-compose PostgreSQL and secret key now use required env variables (C-1, C-2)
 
 ---
-## Current Version: 2.1.0
 
 ### v2.0.1 -- Security & Bug Fix Patch
 
@@ -322,6 +319,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.1.0)
+## Recent Changes (since v2.6.2)
 
 None yet.

@@ -7,7 +7,7 @@ WORKDIR /app
 # Each Java version is installed independently so unavailable versions (depending
 # on the Debian release in the base image) don't fail the build.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends lib32gcc-s1 lib32stdc++6 curl ca-certificates && \
+    apt-get install -y --no-install-recommends lib32gcc-s1 lib32stdc++6 curl ca-certificates openssl && \
     for v in 8 17 21; do \
       apt-get install -y --no-install-recommends openjdk-${v}-jre-headless 2>/dev/null || true; \
     done && \

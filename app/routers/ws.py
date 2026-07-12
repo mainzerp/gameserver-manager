@@ -19,10 +19,11 @@ async def console_ws(websocket: WebSocket, server_id: int):
 
     await websocket.accept()
 
+    from sqlalchemy import select
+
     from app.database import async_session
     from app.models.server_access import ServerAccess
     from app.models.user import User
-    from sqlalchemy import select
 
     user_id = websocket.session.get("user_id")
     async with async_session() as db:
@@ -99,6 +100,7 @@ async def steamcmd_ws(websocket: WebSocket, server_id: int):
     await websocket.accept()
 
     import asyncio
+
     from app.services.steamcmd import steamcmd
 
     queue: asyncio.Queue = asyncio.Queue()

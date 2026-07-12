@@ -5,10 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.api_key import ApiKey
-from app.models.user import User
 from app.services.api_key_service import generate_api_key, revoke_api_key
-from app.services.auth import get_current_user, get_current_user_dep
 from app.services.audit_service import audit_service, get_audit_context
+from app.services.auth import get_current_user, get_current_user_dep
 from app.template_utils import templates
 
 router = APIRouter(prefix="/api-keys", dependencies=[Depends(get_current_user_dep)])

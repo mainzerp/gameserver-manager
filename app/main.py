@@ -1,8 +1,9 @@
 import asyncio
 import logging
+import os
+from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,32 +16,33 @@ from app.middleware.csrf import CSRFMiddleware
 from app.middleware.locale import LocaleMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.models.server import Server, ServerStatus
-from app.routers import files, health as health_router, mods, servers, ws
+from app.routers import api_keys as api_keys_router
+from app.routers import audit as audit_router
 from app.routers import auth as auth_router
 from app.routers import backups as backups_router
-from app.routers import scheduler as scheduler_router
-from app.routers import api_keys as api_keys_router
-from app.routers import status as status_router
-from app.routers import audit as audit_router
-from app.routers import users as users_router
-from app.routers import webhooks as webhooks_router
+from app.routers import files, mods, servers, ws
+from app.routers import health as health_router
+from app.routers import invites as invites_router
 from app.routers import metrics as metrics_router
 from app.routers import nodes as nodes_router
+from app.routers import scheduler as scheduler_router
+from app.routers import site_settings as site_settings_router
+from app.routers import status as status_router
+from app.routers import users as users_router
+from app.routers import webhooks as webhooks_router
 from app.routers.api_v1 import api_router
+from app.services import settings_service
+from app.services.audit_service import audit_service
 from app.services.auth import RedirectException
+from app.services.docker_manager import docker_manager
 from app.services.mod_updater import mod_updater
+from app.services.node_manager import node_manager
 from app.services.resource_monitor import resource_monitor
 from app.services.server_manager import server_manager
-from app.services.task_scheduler import task_scheduler
-from app.services.audit_service import audit_service
-from app.services.update_checker import update_checker
-from app.services.sftp_server import sftp_manager
-from app.services.docker_manager import docker_manager
 from app.services.server_updater import server_updater
-from app.services.node_manager import node_manager
-from app.services import settings_service
-from app.routers import site_settings as site_settings_router
-from app.routers import invites as invites_router
+from app.services.sftp_server import sftp_manager
+from app.services.task_scheduler import task_scheduler
+from app.services.update_checker import update_checker
 
 logging.basicConfig(
     level=logging.DEBUG if settings.debug else logging.INFO,
@@ -96,7 +98,7 @@ async def lifespan(app: FastAPI):
     async with async_session() as session:
         result = await session.execute(
             select(Server).where(
-                Server.auto_start == True, Server.status == ServerStatus.STOPPED
+                Server.auto_start.is_(True), Server.status == ServerStatus.STOPPED
             )
         )
         auto_start_servers = result.scalars().all()
@@ -279,8 +281,6 @@ app.include_router(invites_router.router)
 app.include_router(api_router)
 
 # Static files
-import os
-
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.isdir(_static_dir):
     app.mount("/static", StaticFiles(directory=_static_dir), name="static")

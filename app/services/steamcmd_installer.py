@@ -54,11 +54,10 @@ class SteamCMDInstaller:
         logger.info("Extracting SteamCMD...")
         try:
             if is_windows:
-                with zipfile.ZipFile(archive_path, "r") as zf:
-                    zf.extractall(install_dir)
+                self._safe_extract_zip(archive_path, install_dir)
             else:
                 with tarfile.open(archive_path, "r:gz") as tf:
-                    tf.extractall(install_dir)
+                    tf.extractall(install_dir, filter="data")
         except Exception as e:
             logger.error(f"Failed to extract SteamCMD: {e}")
             return False
@@ -96,6 +95,17 @@ class SteamCMDInstaller:
             return False
 
         return self.is_installed()
+
+    @staticmethod
+    def _safe_extract_zip(archive_path: str, install_dir: str) -> None:
+        """Extract a zip archive with per-member path traversal validation."""
+        dest = Path(install_dir).resolve()
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            for member in zf.infolist():
+                member_path = (dest / member.filename).resolve()
+                if not member_path.is_relative_to(dest):
+                    raise ValueError(f"Unsafe path in zip entry: {member.filename}")
+            zf.extractall(install_dir)
 
 
 steamcmd_installer = SteamCMDInstaller()

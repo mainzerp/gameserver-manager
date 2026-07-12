@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import re
+import secrets
 import shlex
 import sys
 import uuid
@@ -43,7 +44,11 @@ STEAM_APPS = {
         "name": "Rust",
         "executable": "RustDedicated",
         "default_port": 28015,
-        "start_args": '-batchmode +server.port {port} +server.hostname "{name}" +server.maxplayers 50 +server.worldsize 3000',
+        "start_args": (
+            '-batchmode +server.port {port} '
+            '+server.hostname "{name}" '
+            '+server.maxplayers 50 +server.worldsize 3000'
+        ),
         "login_required": False,
         "workshop_supported": True,
         "config_files": ["server/rustserver/cfg/serverauto.cfg"],
@@ -53,7 +58,11 @@ STEAM_APPS = {
         "name": "ARK: Survival Evolved",
         "executable": "ShooterGame/Binaries/Linux/ShooterGameServer",
         "default_port": 7777,
-        "start_args": "TheIsland?listen?SessionName={name}?ServerPassword=?Port={port}?QueryPort={query_port} -server -log",
+        "start_args": (
+            "TheIsland?listen?SessionName={name}"
+            "?ServerPassword=?Port={port}"
+            "?QueryPort={query_port} -server -log"
+        ),
         "login_required": False,
         "workshop_supported": True,
         "config_files": ["ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini"],
@@ -380,19 +389,46 @@ class SteamCMD:
         )
         return {"ok": False, "message": message, "operation_id": operation_id}
 
+    def _write_login_script(
+        self, username: str, password: str, steam_guard_code: str | None
+    ) -> str:
+        """Write a temporary SteamCMD runscript containing the login command.
+
+        Keeps the password out of the process argv (visible via ``ps`` /
+        ``/proc/<pid>/cmdline``).  The caller must delete the returned path.
+        """
+        auth_dir = Path("data") / "auth"
+        auth_dir.mkdir(parents=True, exist_ok=True)
+        script_path = auth_dir / f"gsm_login_{secrets.token_hex(8)}.txt"
+
+        parts = ["login", username, password]
+        if steam_guard_code:
+            parts.append(steam_guard_code)
+        script_path.write_text(" ".join(parts) + "\n", encoding="utf-8")
+
+        try:
+            os.chmod(script_path, 0o600)
+        except OSError:
+            pass
+
+        return str(script_path)
+
     def _build_login_args(
         self,
         login_anonymous: bool,
         username: str | None,
         password: str | None,
         steam_guard_code: str | None,
+        _created_scripts: list[str] | None = None,
     ) -> list[str]:
         if login_anonymous or not username:
             return ["+login", "anonymous"]
-        login_args = ["+login", username, password or ""]
-        if steam_guard_code:
-            login_args.append(steam_guard_code)
-        return login_args
+        script_path = self._write_login_script(
+            username, password or "", steam_guard_code
+        )
+        if _created_scripts is not None:
+            _created_scripts.append(script_path)
+        return ["+runscript", script_path]
 
     def _is_guard_required_line(self, line: str) -> bool:
         lowered = line.lower()
@@ -688,9 +724,11 @@ class SteamCMD:
         install_path.mkdir(parents=True, exist_ok=True)
         operation_id = operation_id or uuid.uuid4().hex
 
+        login_scripts: list[str] = []
+
         def build_cmd(guard_code: str | None) -> list[str]:
             login_args = self._build_login_args(
-                login_anonymous, username, password, guard_code
+                login_anonymous, username, password, guard_code, login_scripts
             )
             cmd = [
                 self._steamcmd_path,
@@ -734,6 +772,11 @@ class SteamCMD:
                 )
             finally:
                 self._guard_waiters.pop(operation_id, None)
+                for _script in login_scripts:
+                    try:
+                        os.remove(_script)
+                    except OSError:
+                        pass
 
         result["operation_id"] = operation_id
         if result.get("ok"):
@@ -871,7 +914,8 @@ class SteamCMD:
         if guard_type != "none" and not interactive:
             return (
                 kwargs,
-                f"Steam account '{creds.get('username')}' requires Steam Guard input and cannot be used in unattended SteamCMD operations.",
+                f"Steam account '{creds.get('username')}' requires Steam Guard "
+                f"input and cannot be used in unattended SteamCMD operations.",
             )
 
         kwargs.update(
@@ -909,9 +953,11 @@ class SteamCMD:
         install_path = Path(install_dir)
         install_path.mkdir(parents=True, exist_ok=True)
 
+        login_scripts: list[str] = []
+
         def build_cmd(guard_code: str | None) -> list[str]:
             login_args = self._build_login_args(
-                login_anonymous, username, password, guard_code
+                login_anonymous, username, password, guard_code, login_scripts
             )
             return [
                 self._steamcmd_path,
@@ -951,6 +997,11 @@ class SteamCMD:
                 )
             finally:
                 self._guard_waiters.pop(operation_id, None)
+                for _script in login_scripts:
+                    try:
+                        os.remove(_script)
+                    except OSError:
+                        pass
 
         result["operation_id"] = operation_id
         if result.get("ok"):

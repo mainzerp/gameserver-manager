@@ -408,7 +408,8 @@ class ModUpdater:
                         mod.last_checked = datetime.now(timezone.utc)
                         stats["resolved"] += 1
                         logger.info(
-                            f"Resolved imported mod '{mod.file_name}' -> {project.get('title', project_id)} v{version_number}"
+                            f"Resolved imported mod '{mod.file_name}' ->"
+                            f" {project.get('title', project_id)} v{version_number}"
                         )
                     except Exception as e:
                         logger.debug(f"Error resolving mod hash {h[:16]}: {e}")
@@ -834,6 +835,7 @@ class ModUpdater:
     async def save_profile(self, server_id: int, name: str):
         """Save current mods as a reusable profile."""
         import json as _json
+
         from app.models.mod_profile import ModProfile
 
         async with async_session() as session:
@@ -866,6 +868,7 @@ class ModUpdater:
     async def apply_profile(self, server_id: int, profile_id: int) -> dict:
         """Apply a mod profile to a server."""
         import json as _json
+
         from app.models.mod_profile import ModProfile
 
         async with async_session() as session:

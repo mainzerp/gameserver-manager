@@ -1,22 +1,18 @@
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 import os
 import tempfile
 
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
-from app.models.mod import Mod
 from app.models.server import Server
+from app.services.audit_service import audit_service, get_audit_context
 from app.services.auth import (
-    get_current_user,
     get_current_user_dep,
     require_server_access,
 )
 from app.services.mod_updater import mod_updater
-from app.services.audit_service import audit_service, get_audit_context
-from app.template_utils import templates
 from app.validation import validate_mod_install
 
 router = APIRouter(
@@ -114,7 +110,10 @@ async def update_all_mods(
 ):
     await require_server_access(request, server_id, "manage", db)
     results = await mod_updater.update_all_mods(server_id)
-    return RedirectResponse(url=f"/servers/{server_id}?tab=mods", status_code=303)
+    return RedirectResponse(
+        url=f"/servers/{server_id}?tab=mods&updated={results['updated']}&failed={results['failed']}",
+        status_code=303,
+    )
 
 
 @router.post("/check-updates")

@@ -2,6 +2,7 @@
 
 import ipaddress
 import logging
+import socket
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,7 @@ _PRIVATE_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("169.254.0.0/16"),
     ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
     ipaddress.ip_network("::1/128"),
     ipaddress.ip_network("fc00::/7"),
     ipaddress.ip_network("fe80::/10"),
@@ -36,9 +38,21 @@ def is_internal_url(url: str) -> bool:
                 if ip in network:
                     return True
         except ValueError:
-            # hostname is not an IP address, resolve via DNS not done here.
-            # We allow external hostnames; block only obviously internal ones.
-            pass
+            # Hostname is not a literal IP — resolve via DNS and check
+            # every returned address to block DNS-rebinding attacks.
+            try:
+                addr_infos = socket.getaddrinfo(hostname, None)
+                for addr_info in addr_infos:
+                    ip_str = addr_info[4][0]
+                    try:
+                        resolved_ip = ipaddress.ip_address(ip_str)
+                    except ValueError:
+                        continue
+                    for network in _PRIVATE_NETWORKS:
+                        if resolved_ip in network:
+                            return True
+            except socket.gaierror:
+                pass
         return False
     except Exception as exc:
         logger.debug("SSRF check failed for URL %r: %s", url, exc)

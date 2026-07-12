@@ -1,0 +1,45 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff pytest pytest-asyncio
+
+      - name: Lint
+        run: ruff check app main.py
+
+      - name: Test
+        run: pytest tests/ -q
+
+      - name: Check single Alembic head
+        run: |
+          alembic heads | tee /tmp/alembic_heads.txt
+          # There must be exactly one head revision.
+          head_count=$(grep -c "^[a-f0-9]" /tmp/alembic_heads.txt || true)
+          echo "Head count: $head_count"
+          test "$head_count" -eq 1
+
+      - name: Migration sanity check (SQLite)
+        # Best-effort: verifies init_db() can run the full migration chain
+        # on a throwaway SQLite database. May fail on SQLite due to a
+        # pre-existing PostgreSQL-only statement in migration b7_01
+        # (DROP COLUMN IF EXISTS). The single-head check above is the
+        # authoritative guard against branched migrations.
+        continue-on-error: true
+        run: |
+          GSM_SECRET_KEY="ci-test-key-not-for-prod" \
+          GSM_DATABASE_URL="sqlite:///./ci_migrate_check.db" \
+          python -c "import asyncio; from app.database import init_db; asyncio.run(init_db())"

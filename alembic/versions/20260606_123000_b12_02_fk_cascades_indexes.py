@@ -1,7 +1,7 @@
 """Add FK ondelete cascades, missing indexes, and fix user role default
 
 Revision ID: b12_02_fk_cascades_indexes
-Revises: b11_04_server_gmod_gslt
+Revises: b12_01_user_security
 Create Date: 2026-06-06 12:30:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 revision: str = "b12_02_fk_cascades_indexes"
-down_revision: Union[str, None] = "b11_04_server_gmod_gslt"
+down_revision: Union[str, None] = "b12_01_user_security"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

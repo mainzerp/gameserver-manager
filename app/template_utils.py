@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from starlette.requests import Request
 
-from app.i18n import get_translations, get_locale_from_request, SUPPORTED_LOCALES
+from app.i18n import SUPPORTED_LOCALES, get_translations
 
 templates = Jinja2Templates(
     directory=str(Path(__file__).resolve().parent / "templates")

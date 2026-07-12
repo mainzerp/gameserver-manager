@@ -1,7 +1,9 @@
 import os
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app import __version__
 
 
 class Settings(BaseSettings):
@@ -65,16 +67,13 @@ class Settings(BaseSettings):
     multi_node_enabled: bool = False
     totp_global_enabled: bool = False
     backup_external_path: str = ""
-    version: str = "2.4.0"
+    version: str = __version__
     # Docker Compose env vars (documented to satisfy extra="forbid")
     postgres_db: str = ""
     postgres_user: str = ""
     postgres_password: str = ""
 
-    class Config:
-        env_file = ".env"
-        env_prefix = "GSM_"
-        extra = "forbid"
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="GSM_", extra="forbid")
 
 
 settings = Settings()

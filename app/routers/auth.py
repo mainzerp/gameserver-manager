@@ -7,24 +7,24 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
+from app.services.audit_service import audit_service, get_audit_context
 from app.services.auth import (
-    hash_password,
-    verify_password,
+    generate_recovery_codes,
     generate_totp_secret,
+    get_current_user,
     get_totp_uri,
+    hash_password,
+    hash_recovery_codes,
+    verify_password,
+    verify_recovery_code,
     verify_totp,
     verify_totp_with_replay_protection,
-    generate_recovery_codes,
-    hash_recovery_codes,
-    verify_recovery_code,
-    get_current_user,
 )
-from app.services.audit_service import audit_service, get_audit_context
 from app.template_utils import templates
 
 router = APIRouter()

@@ -525,8 +525,9 @@ class ServerManager:
 
     async def _watch_container(self, server_id: int, container_id: str):
         """Watch a Docker container and update status when it exits."""
-        from app.services.docker_manager import docker_manager
         import asyncio as _asyncio
+
+        from app.services.docker_manager import docker_manager
 
         while True:
             await _asyncio.sleep(5)
@@ -873,8 +874,8 @@ class ServerManager:
             # Auto-detect managed Java if using default "java" and MC version is set
             if java_path == "java" and server.mc_version:
                 from app.services.java_manager import (
-                    get_required_java_version,
                     get_managed_java_path,
+                    get_required_java_version,
                 )
 
                 required = get_required_java_version(server.mc_version)
@@ -900,7 +901,7 @@ class ServerManager:
             else:
                 cmd.append("nogui")
             return cmd
-        from app.services.steamcmd import build_runtime_command, _validate_server_name
+        from app.services.steamcmd import _validate_server_name, build_runtime_command
 
         _validate_server_name(server.name)
         return build_runtime_command(server)

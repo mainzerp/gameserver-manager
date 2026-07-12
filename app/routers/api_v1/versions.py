@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.services.auth import get_current_user_flexible
-from app.services.version_cache import version_cache
 from app.services.java_manager import get_required_java_version
+from app.services.version_cache import version_cache
 
 logger = logging.getLogger(__name__)
 

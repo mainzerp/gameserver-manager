@@ -96,8 +96,8 @@ class TaskSchedulerService:
                             raise ValueError("Command contains forbidden characters")
                         await server_manager.send_command(task.server_id, task.command)
                 elif task.task_type == TaskType.STEAM_UPDATE:
-                    from app.services.server_updater import server_updater
                     from app.models.server import Server
+                    from app.services.server_updater import server_updater
 
                     server = await session.get(Server, task.server_id)
                     if server and server.steam_app_id:
@@ -112,8 +112,8 @@ class TaskSchedulerService:
                                 result.get("message") or "Steam update failed"
                             )
                 elif task.task_type == TaskType.STEAM_VALIDATE:
-                    from app.services.steamcmd import steamcmd
                     from app.models.server import Server
+                    from app.services.steamcmd import steamcmd
 
                     server = await session.get(Server, task.server_id)
                     if server and server.steam_app_id:
@@ -269,7 +269,8 @@ class TaskSchedulerService:
 
             # Create warning task if warning_minutes > 0
             if warning_min and warning_min > 0:
-                from datetime import datetime as dt, timedelta
+                from datetime import datetime as dt
+                from datetime import timedelta
 
                 try:
                     stop_dt = dt.strptime(stop_time, "%H:%M")

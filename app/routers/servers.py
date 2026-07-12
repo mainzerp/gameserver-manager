@@ -26,17 +26,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import async_session, get_db
 from app.models.backup import Backup
+from app.models.metric import MetricSnapshot
 from app.models.mod import Mod
 from app.models.node import Node
 from app.models.scheduled_task import ScheduledTask, TaskType
 from app.models.server import Server, ServerStatus, ServerType
-from app.models.metric import MetricSnapshot
+from app.routers.files import _extract_archive
+from app.services.audit_service import audit_service, get_audit_context
 from app.services.auth import (
+    get_accessible_server_ids,
     get_current_user,
     get_current_user_dep,
     require_role,
     require_server_access,
-    get_accessible_server_ids,
+)
+from app.services.config_editor import (
+    generate_default_properties,
+    get_field_schema,
+    parse_properties,
 )
 from app.services.jar_downloader import download_server_jar
 from app.services.java_manager import (
@@ -44,26 +51,19 @@ from app.services.java_manager import (
     get_required_java_version,
 )
 from app.services.log_manager import log_manager
+from app.services.mod_updater import mod_updater
+from app.services.player_manager import player_manager
+from app.services.port_manager import port_manager
+from app.services.query_protocol import minecraft_query, steam_query
+from app.services.rcon_client import RCONClient
 from app.services.resource_monitor import resource_monitor
 from app.services.server_detector import detect_server_info
 from app.services.server_manager import server_manager
-from app.services.port_manager import port_manager
-from app.services.rcon_client import RCONClient
-from app.services.config_editor import (
-    generate_default_properties,
-    parse_properties,
-    get_field_schema,
-)
-from app.services.steamcmd import generate_start_command, steamcmd
-from app.services.audit_service import audit_service, get_audit_context
-from app.services.world_manager import world_manager
-from app.services.server_updater import server_updater
 from app.services.server_templates import get_templates
-from app.services.query_protocol import minecraft_query, steam_query
-from app.services.player_manager import player_manager
-from app.services.mod_updater import mod_updater
+from app.services.server_updater import server_updater
+from app.services.steamcmd import generate_start_command, steamcmd
+from app.services.world_manager import world_manager
 from app.template_utils import templates
-from app.routers.files import _extract_archive
 from app.validation import (
     validate_command_length,
     validate_mc_version,
@@ -1114,7 +1114,7 @@ async def server_detail(
     managed_javas = []
     if server.mc_version and server.server_type == ServerType.MINECRAFT_JAVA:
         required_java_version = get_required_java_version(server.mc_version)
-        from app.services.java_manager import list_managed_javas, get_managed_java_path
+        from app.services.java_manager import get_managed_java_path, list_managed_javas
 
         managed_javas = list_managed_javas()
         # Check if current java_path is likely to work
@@ -2429,8 +2429,8 @@ async def save_server_config(
         raise HTTPException(status_code=404, detail="Server not found")
 
     from app.services.config_editor import (
-        write_properties,
         get_field_schema,
+        write_properties,
     )
 
     form = await request.form()

@@ -30,9 +30,10 @@ try:
             return True
 
         async def validate_password(self, username, password):
+            from sqlalchemy import select
+
             from app.database import async_session
             from app.models.user import User
-            from sqlalchemy import select
             from app.services.auth import pwd_context
 
             try:

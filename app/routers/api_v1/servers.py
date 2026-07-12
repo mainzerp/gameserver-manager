@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -10,9 +10,9 @@ from app.database import get_db
 from app.models.mod import Mod
 from app.models.server import Server
 from app.services.auth import (
+    get_accessible_server_ids,
     get_current_user_flexible,
     require_server_access,
-    get_accessible_server_ids,
 )
 from app.services.log_manager import log_manager
 from app.services.port_manager import port_manager

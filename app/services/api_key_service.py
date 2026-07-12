@@ -32,7 +32,7 @@ async def verify_api_key(raw_key: str) -> User | None:
     prefix = raw_key[:12]
     async with async_session() as session:
         result = await session.execute(
-            select(ApiKey).where(ApiKey.key_prefix == prefix, ApiKey.is_active == True)
+            select(ApiKey).where(ApiKey.key_prefix == prefix, ApiKey.is_active.is_(True))
         )
         candidates = result.scalars().all()
 

@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import zipfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import select
@@ -114,7 +114,8 @@ class BackupManager:
             await self._enforce_retention(server_id)
 
             logger.info(
-                f"Created {backup_type} backup {file_name} for server {server.name} ({size_bytes} bytes, {file_count} files)"
+                f"Created {backup_type} backup {file_name} for server {server.name}"
+                f" ({size_bytes} bytes, {file_count} files)"
             )
             asyncio.create_task(
                 notification_service.notify(

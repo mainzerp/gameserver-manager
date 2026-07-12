@@ -9,7 +9,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.node import Node
 from app.models.server import Server
-from app.services.auth import get_current_user, get_current_user_dep, require_role
+from app.services.auth import get_current_user_dep, require_role
 from app.services.node_manager import node_manager
 from app.template_utils import templates
 

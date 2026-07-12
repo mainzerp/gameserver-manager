@@ -53,7 +53,7 @@ class InviteService:
     async def redeem_invite(self, db: AsyncSession, code: str, user_id: int) -> dict:
         result = await db.execute(
             select(InviteLink).where(
-                InviteLink.code == code, InviteLink.is_active == True
+                InviteLink.code == code, InviteLink.is_active.is_(True)
             )
         )
         invite = result.scalars().first()

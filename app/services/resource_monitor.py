@@ -149,6 +149,7 @@ class ResourceMonitor:
 
     async def cleanup_old_metrics(self):
         from sqlalchemy import delete
+
         from app.database import async_session
         from app.models.metric import MetricSnapshot
 

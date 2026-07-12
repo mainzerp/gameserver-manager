@@ -1,5 +1,4 @@
 import logging
-import secrets
 
 from app.config import settings
 
@@ -33,12 +32,12 @@ class WebAuthnService:
         if not WEBAUTHN_AVAILABLE:
             raise RuntimeError("py-webauthn is not installed")
         from webauthn import generate_registration_options
+        from webauthn.helpers.cose import COSEAlgorithmIdentifier
         from webauthn.helpers.structs import (
             AuthenticatorSelectionCriteria,
             ResidentKeyRequirement,
             UserVerificationRequirement,
         )
-        from webauthn.helpers.cose import COSEAlgorithmIdentifier
 
         exclude_credentials = [
             {"id": c.credential_id, "type": "public-key"} for c in existing_credentials
@@ -111,7 +110,6 @@ class WebAuthnService:
         from webauthn import verify_authentication_response
         from webauthn.helpers.structs import (
             AuthenticationCredential,
-            PublicKeyCredentialDescriptor,
         )
 
         credential = AuthenticationCredential.parse_raw(str(credential_json))

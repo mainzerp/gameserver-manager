@@ -1,5 +1,5 @@
-from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.requests import Request
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.i18n import get_locale_from_request
 from app.template_utils import _current_locale

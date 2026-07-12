@@ -50,9 +50,9 @@ FastAPI (app/main.py)
     |       |
     |       +-- Templates (Jinja2 HTML) -- Server-side rendered
     |       |
-    |       +-- Services (30 service modules)
+    |       +-- Services (37 service modules)
     |               |
-    |               +-- Models (13 SQLAlchemy models)
+    |               +-- Models (17 SQLAlchemy models)
     |                       |
     |                       +-- PostgreSQL / SQLite (via Alembic migrations)
     |
@@ -106,7 +106,7 @@ gameserver/
 |-- alembic/
 |   |-- env.py                    # Alembic environment configuration
 |   |-- script.py.mako            # Migration template
-|   |-- versions/                 # 18 migration files (initial through batch 7)
+|   |-- versions/                 # 32 migration files (initial through batch 7)
 |
 |-- app/
 |   |-- __init__.py
@@ -120,7 +120,7 @@ gameserver/
 |   |-- middleware/
 |   |   |-- csrf.py               # CSRF protection middleware
 |   |
-|   |-- models/                   # 13 SQLAlchemy ORM models
+|   |-- models/                   # 17 SQLAlchemy ORM models
 |   |   |-- api_key.py            # API key model
 |   |   |-- audit_log.py          # Audit log entries
 |   |   |-- backup.py             # Backup records
@@ -135,7 +135,7 @@ gameserver/
 |   |   |-- webauthn_credential.py # WebAuthn passkey credentials
 |   |   |-- webhook.py            # Custom webhook definitions
 |   |
-|   |-- routers/                  # 16 web routers + API v1 sub-routers
+|   |-- routers/                  # 17 web routers + API v1 sub-routers
 |   |   |-- api_keys.py           # API key management UI
 |   |   |-- audit.py              # Audit log viewer
 |   |   |-- auth.py               # Login, logout, setup, 2FA
@@ -166,7 +166,7 @@ gameserver/
 |   |   |-- server.py
 |   |   |-- system.py
 |   |
-|   |-- services/                 # 30 service modules
+|   |-- services/                 # 37 service modules
 |   |   |-- api_key_service.py    # API key generation and validation
 |   |   |-- audit_service.py      # Audit log recording and cleanup
 |   |   |-- auth.py               # Authentication, session management, RBAC
@@ -254,11 +254,11 @@ gameserver/
 
 - **Primary**: PostgreSQL 17 via asyncpg (default in docker-compose)
 - **Alternative**: SQLite via aiosqlite, MySQL via aiomysql
-- **Migrations**: Alembic (18 migration files, from initial schema through batch 7)
+- **Migrations**: Alembic (32 migration files, from initial schema through batch 7)
 - **Session factory**: `async_sessionmaker` with `expire_on_commit=False`
 - **Base class**: `DeclarativeBase` (SQLAlchemy 2.0 style)
 
-### Models (13 total)
+### Models (17 total)
 
 | Model | Table | Key Fields |
 |---|---|---|
@@ -278,7 +278,7 @@ gameserver/
 
 ---
 
-## Routers (16 + API v1)
+## Routers (17 + API v1)
 
 ### Web Routers
 
@@ -314,7 +314,7 @@ Authentication: API key via `X-API-Key` header.
 
 ---
 
-## Services (30 modules)
+## Services (37 modules)
 
 | Service | Pattern | Purpose |
 |---|---|---|

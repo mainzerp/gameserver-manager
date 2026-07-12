@@ -5,13 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.backup import Backup
 from app.models.server import Server
+from app.services.audit_service import audit_service, get_audit_context
 from app.services.auth import (
-    get_current_user,
     get_current_user_dep,
     require_server_access,
 )
 from app.services.backup_manager import backup_manager
-from app.services.audit_service import audit_service, get_audit_context
 from app.template_utils import templates
 
 router = APIRouter(dependencies=[Depends(get_current_user_dep)])

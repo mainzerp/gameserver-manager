@@ -7,12 +7,11 @@ from app.database import get_db
 from app.models.server import Server
 from app.models.server_access import ServerAccess
 from app.models.user import User
+from app.services.audit_service import audit_service, get_audit_context
 from app.services.auth import (
-    get_current_user,
     hash_password,
     require_role,
 )
-from app.services.audit_service import audit_service, get_audit_context
 from app.template_utils import templates
 
 router = APIRouter(prefix="/users")
@@ -88,7 +87,7 @@ async def update_user(
     role: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    current = await _require_admin(request)
+    await _require_admin(request)
     if role not in ("admin", "operator", "viewer"):
         raise HTTPException(status_code=400, detail="Invalid role")
 

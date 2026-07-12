@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.site_settings import SiteSettings
-from app.services.auth import get_current_user, get_current_user_dep, require_role
 from app.services import settings_service
+from app.services.auth import get_current_user_dep, require_role
 from app.template_utils import templates
 
 logger = logging.getLogger(__name__)
@@ -149,8 +149,9 @@ async def test_smtp(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/test-discord")
 async def test_discord(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")
-    from app.config import settings as cfg
     import httpx
+
+    from app.config import settings as cfg
 
     if not cfg.discord_webhook_url:
         return JSONResponse(
@@ -175,8 +176,9 @@ async def test_discord(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/test-telegram")
 async def test_telegram(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")
-    from app.config import settings as cfg
     import httpx
+
+    from app.config import settings as cfg
 
     if not cfg.telegram_bot_token or not cfg.telegram_chat_id:
         return JSONResponse(

@@ -1,22 +1,28 @@
-import base64
-import hashlib
 import logging
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.site_settings import SiteSettings
+from app.models.steam_account import _derive_key_legacy, _derive_key_v2
 
 logger = logging.getLogger(__name__)
 
 
+def _encryption_secret() -> str:
+    return settings.encryption_key or settings.secret_key
+
+
 def _fernet() -> Fernet:
-    """Derive a stable Fernet key from the application secret_key."""
-    raw = hashlib.sha256(settings.secret_key.encode()).digest()
-    key = base64.urlsafe_b64encode(raw)
-    return Fernet(key)
+    """Derive a Fernet key using the strong PBKDF2 method (v2)."""
+    return Fernet(_derive_key_v2(_encryption_secret()))
+
+
+def _fernet_legacy() -> Fernet:
+    """Derive a Fernet key using the legacy SHA-256 method for backward compat."""
+    return Fernet(_derive_key_legacy(_encryption_secret()))
 
 
 def _encrypt(value: str) -> str:
@@ -26,9 +32,17 @@ def _encrypt(value: str) -> str:
 def _decrypt(value: str) -> str:
     try:
         return _fernet().decrypt(value.encode()).decode()
-    except Exception:
-        logger.warning("Failed to decrypt settings value; returning empty string")
-        return ""
+    except InvalidToken:
+        pass
+    try:
+        return _fernet_legacy().decrypt(value.encode()).decode()
+    except InvalidToken:
+        pass
+    logger.error(
+        "Failed to decrypt settings value with both v2 and legacy keys; "
+        "returning empty string"
+    )
+    return ""
 
 
 async def _get_or_create(db: AsyncSession) -> SiteSettings:

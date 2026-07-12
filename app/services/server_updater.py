@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session
-from app.models.server import Server, ServerStatus
+from app.models.server import Server
 from app.services.backup_manager import backup_manager
 from app.services.jar_downloader import download_server_jar, get_latest_version
 from app.services.notification_service import notification_service
@@ -213,7 +213,7 @@ class ServerUpdater:
         """Scheduled job: check all servers with auto_update_server enabled."""
         async with async_session() as db:
             result = await db.execute(
-                select(Server).where(Server.auto_update_server == True)
+                select(Server).where(Server.auto_update_server.is_(True))
             )
             servers = result.scalars().all()
             server_ids = [s.id for s in servers]

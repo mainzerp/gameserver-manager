@@ -7,14 +7,13 @@ from starlette.responses import JSONResponse
 from app.database import get_db
 from app.models.scheduled_task import ScheduledTask, TaskType
 from app.models.server import Server
+from app.services.audit_service import audit_service, get_audit_context
 from app.services.auth import (
-    get_current_user,
     get_current_user_dep,
     require_role,
     require_server_access,
 )
 from app.services.task_scheduler import task_scheduler
-from app.services.audit_service import audit_service, get_audit_context
 from app.template_utils import templates
 
 router = APIRouter(prefix="/scheduler", dependencies=[Depends(get_current_user_dep)])

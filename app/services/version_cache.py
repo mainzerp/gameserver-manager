@@ -1,7 +1,7 @@
 """In-memory TTL cache for version data from external APIs."""
 
-import time
 import logging
+import time
 from typing import Any
 
 logger = logging.getLogger(__name__)

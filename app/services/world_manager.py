@@ -92,8 +92,8 @@ class WorldManager:
         world_name: str,
         create_backup: bool = True,
     ) -> dict:
-        from app.services.server_manager import server_manager
         from app.services.backup_manager import backup_manager
+        from app.services.server_manager import server_manager
 
         if server_manager.is_running(server_id):
             return {
