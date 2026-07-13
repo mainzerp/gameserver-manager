@@ -1,6 +1,11 @@
 # Version History
 
-## Current Version: 2.10.1
+## Current Version: 2.10.2
+
+### v2.10.2 -- UI Label Adjustment
+
+**Changed:**
+- Sidebar brand label renamed from "GameServer Manager" to "GSM".
 
 ### v2.10.1 -- Full-width Layout Fix
 
