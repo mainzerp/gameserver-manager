@@ -617,14 +617,9 @@
                 {{ _("Dashboard") }}
             </a>
 
-            <a href="/servers/create" class="sidebar-link {% if current_path == '/servers/create' %}sidebar-link-active{% endif %}">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                {{ _("New Server") }}
-            </a>
-
-            <a href="/servers/import" class="sidebar-link {% if current_path == '/servers/import' %}sidebar-link-active{% endif %}">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
-                {{ _("Import") }}
+            <a href="/servers" class="sidebar-link {% if current_path.startswith('/servers') and not current_path.startswith('/servers/create') and not current_path.startswith('/servers/import') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 0 00-2-2"/></svg>
+                {{ _("Servers") }}
             </a>
 
             <a href="/scheduler" class="sidebar-link {% if current_path.startswith('/scheduler') %}sidebar-link-active{% endif %}">

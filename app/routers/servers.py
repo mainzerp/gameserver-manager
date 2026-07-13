@@ -381,6 +381,59 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
         })
 
 
+@router.get("/servers", response_class=HTMLResponse)
+async def server_list(request: Request, db: AsyncSession = Depends(get_db)):
+    user = await get_current_user(request, db)
+    accessible_ids = await get_accessible_server_ids(user, db)
+    query = select(Server)
+    if accessible_ids is not None:
+        query = query.where(Server.id.in_(accessible_ids))
+    result = await db.execute(query)
+    servers = result.scalars().all()
+
+    dirty = False
+    for s in servers:
+        if server_manager.is_running(s.id) and s.status not in (
+            ServerStatus.RUNNING,
+            ServerStatus.STARTING,
+        ):
+            s.status = ServerStatus.RUNNING
+            dirty = True
+        elif not server_manager.is_running(s.id) and s.status in (
+            ServerStatus.RUNNING,
+            ServerStatus.STARTING,
+        ):
+            s.status = ServerStatus.STOPPED
+            dirty = True
+    if dirty:
+        await db.commit()
+
+    status_counts = {"total": len(servers), "running": 0, "stopped": 0, "crashed": 0}
+    for s in servers:
+        if s.status == ServerStatus.RUNNING:
+            status_counts["running"] += 1
+        elif s.status == ServerStatus.CRASHED:
+            status_counts["crashed"] += 1
+        else:
+            status_counts["stopped"] += 1
+
+    from sqlalchemy import func
+
+    update_result = await db.execute(
+        select(Mod.server_id, func.count(Mod.id))
+        .where(Mod.update_available.is_(True))
+        .group_by(Mod.server_id)
+    )
+    update_counts = dict(update_result.all())
+
+    return templates.TemplateResponse(request, "servers.html", {
+            "servers": servers,
+            "status_counts": status_counts,
+            "update_counts": update_counts,
+            "current_user": user,
+        })
+
+
 @router.get("/servers/create", response_class=HTMLResponse)
 async def create_server_form(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")
