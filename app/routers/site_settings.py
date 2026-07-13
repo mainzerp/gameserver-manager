@@ -57,6 +57,11 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db)):
         })
 
 
+@router.get("/preferences", response_class=HTMLResponse)
+async def preferences_page(request: Request):
+    return templates.TemplateResponse(request, "preferences.html", {})
+
+
 @router.post("/", response_class=HTMLResponse)
 async def settings_save(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")

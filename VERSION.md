@@ -1,6 +1,20 @@
 # Version History
 
-## Current Version: 2.10.2
+## Current Version: 2.11.0
+
+### v2.11.0 -- Header Removal and Preferences Page
+
+**Added:**
+- New `/settings/preferences` page for user-specific settings.
+- Theme toggle and language selector moved to the Preferences page.
+- Global `applyTheme` helper for theme switching across pages.
+
+**Changed:**
+- Removed the top sticky header bar from `base.html`.
+- Added a fixed mobile-only sidebar toggle button at the top-left.
+- Main content area now starts at the top of the viewport on desktop; mobile content gets top padding to avoid the toggle button.
+- Added "Preferences" link under the Account section in the sidebar.
+- Updated active-state logic for Settings/Preferences sidebar links.
 
 ### v2.10.2 -- UI Label Adjustment
 

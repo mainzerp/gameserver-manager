@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _("Preferences") }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">{{ _("Preferences") }}</h1>
+    </div>
+
+    <!-- Theme -->
+    <div class="card">
+        <div class="card-header flex items-center gap-2">
+            <svg class="w-5 h-5" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+            </svg>
+            {{ _("Appearance") }}
+        </div>
+        <div class="card-body">
+            <p class="text-sm mb-4" style="color: var(--clr-text-secondary);">{{ _("Choose between light and dark mode.") }}</p>
+            <button id="theme-toggle" class="btn btn-secondary flex items-center gap-2" type="button">
+                <svg id="theme-icon-dark" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                </svg>
+                <svg id="theme-icon-light" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <span id="theme-label">{{ _("Toggle theme") }}</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Language -->
+    <div class="card">
+        <div class="card-header flex items-center gap-2">
+            <svg class="w-5 h-5" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.5 9a6.5 6.5 0 100-13 6.5 6.5 0 000 13zM3 21h18M3 21l5-5m13 5l-5-5"/>
+            </svg>
+            {{ _("Language") }}
+        </div>
+        <div class="card-body">
+            <p class="text-sm mb-4" style="color: var(--clr-text-secondary);">{{ _("Select your preferred language.") }}</p>
+            <form action="/set-locale" method="post" data-loading>
+                {{ csrf_field(request) }}
+                <div class="flex items-center gap-4">
+                    <select name="locale" class="input-field" style="width: auto; min-width: 160px;">
+                        <option value="en" {% if request.session.get('locale', 'en') == 'en' %}selected{% endif %}>English</option>
+                        <option value="de" {% if request.session.get('locale') == 'de' %}selected{% endif %}>Deutsch</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary">{{ _("Save") }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var html = document.documentElement;
+    var toggle = document.getElementById('theme-toggle');
+    var iconDark = document.getElementById('theme-icon-dark');
+    var iconLight = document.getElementById('theme-icon-light');
+    var label = document.getElementById('theme-label');
+
+    function updateIcons() {
+        if (html.classList.contains('dark')) {
+            iconLight.classList.remove('hidden');
+            iconDark.classList.add('hidden');
+            label.textContent = '{{ _("Switch to light mode") }}';
+        } else {
+            iconDark.classList.remove('hidden');
+            iconLight.classList.add('hidden');
+            label.textContent = '{{ _("Switch to dark mode") }}';
+        }
+    }
+
+    toggle.addEventListener('click', function() {
+        var current = html.classList.contains('dark') ? 'dark' : 'light';
+        var next = current === 'dark' ? 'light' : 'dark';
+        if (window.applyTheme) window.applyTheme(next);
+        updateIcons();
+    });
+
+    updateIcons();
+})();
+</script>
+{% endblock %}
+{% endblock %}

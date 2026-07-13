@@ -656,7 +656,7 @@
                 {{ _("Nodes") }}
             </a>
 
-            <a href="/settings/" class="sidebar-link {% if current_path.startswith('/settings/') and not current_path.startswith('/settings/2fa') %}sidebar-link-active{% endif %}">
+            <a href="/settings/" class="sidebar-link {% if current_path.startswith('/settings/') and not current_path.startswith('/settings/2fa') and not current_path.startswith('/settings/preferences') %}sidebar-link-active{% endif %}">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 {{ _("Settings") }}
             </a>
@@ -668,6 +668,11 @@
             <a href="/api-keys" class="sidebar-link {% if current_path.startswith('/api-keys') %}sidebar-link-active{% endif %}">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                 {{ _("API Keys") }}
+            </a>
+
+            <a href="/settings/preferences" class="sidebar-link {% if current_path.startswith('/settings/preferences') %}sidebar-link-active{% endif %}">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                {{ _("Preferences") }}
             </a>
 
             <a href="/settings/2fa/setup" class="sidebar-link {% if current_path.startswith('/settings/2fa') %}sidebar-link-active{% endif %}">
@@ -700,50 +705,15 @@
 
     </aside>
 
+    <!-- Mobile Sidebar Toggle -->
+    <button id="sidebar-toggle" class="fixed top-4 left-4 z-40 lg:hidden p-2 rounded-lg" style="background: var(--clr-panel); border: 1px solid var(--clr-border); color: var(--clr-text-secondary);" aria-label="Toggle sidebar">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
+
     <!-- Main Content Area -->
-    <div class="lg:ml-[260px] min-h-screen flex flex-col" style="transition: margin var(--transition-normal);">
-
-        <!-- Top Header Bar -->
-        <header class="sticky top-0 z-30 flex items-center gap-4 px-6 py-3" style="background: var(--clr-panel); border-bottom: 1px solid var(--clr-border);">
-
-            <!-- Mobile Hamburger Toggle -->
-            <button id="sidebar-toggle" class="lg:hidden p-1 rounded" style="color: var(--clr-text-secondary);" aria-label="Toggle sidebar">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-            </button>
-
-            <!-- Breadcrumb -->
-            <div class="flex-1 text-sm font-medium" style="color: var(--clr-text-secondary);">
-                {% block breadcrumb %}{% endblock %}
-            </div>
-
-            <!-- Right Actions -->
-            <div class="flex items-center gap-3">
-
-                <!-- Theme Toggle -->
-                <button id="theme-toggle" class="p-2 rounded-lg" style="color: var(--clr-text-secondary); transition: color var(--transition-fast);" title="Toggle theme">
-                    <svg id="theme-icon-dark" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                    </svg>
-                    <svg id="theme-icon-light" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                    </svg>
-                </button>
-
-                <!-- Language Selector -->
-                <form action="/set-locale" method="post" class="inline">
-                    {{ csrf_field(request) }}
-                    <select name="locale" data-auto-submit class="text-xs rounded px-2 py-1 focus:outline-none" style="background: var(--clr-input); border: 1px solid var(--clr-border); color: var(--clr-text-secondary);">
-                        <option value="en" {% if request.session.get('locale', 'en') == 'en' %}selected{% endif %}>EN</option>
-                        <option value="de" {% if request.session.get('locale') == 'de' %}selected{% endif %}>DE</option>
-                    </select>
-                </form>
-
-            </div>
-        </header>
+    <div class="lg:ml-[260px] min-h-screen flex flex-col pt-16 lg:pt-0" style="transition: margin var(--transition-normal);">
 
         <!-- Update Banner -->
         <div class="px-6 pt-4">
@@ -772,31 +742,17 @@
     <script nonce="{{ request.state.csp_nonce }}">
     (function() {
         var html = document.documentElement;
-        var toggle = document.getElementById('theme-toggle');
-        var iconDark = document.getElementById('theme-icon-dark');
-        var iconLight = document.getElementById('theme-icon-light');
-
-        function applyTheme(theme) {
+        window.applyTheme = function(theme) {
             if (theme === 'dark') {
                 html.classList.add('dark');
-                iconLight.classList.remove('hidden');
-                iconDark.classList.add('hidden');
             } else {
                 html.classList.remove('dark');
-                iconDark.classList.remove('hidden');
-                iconLight.classList.add('hidden');
             }
             localStorage.setItem('gsm_theme', theme);
             document.cookie = 'gsm_theme=' + theme + ';path=/;max-age=31536000;SameSite=Lax';
-        }
-
+        };
         var saved = localStorage.getItem('gsm_theme') || 'dark';
-        applyTheme(saved);
-
-        toggle.addEventListener('click', function() {
-            var current = html.classList.contains('dark') ? 'dark' : 'light';
-            applyTheme(current === 'dark' ? 'light' : 'dark');
-        });
+        window.applyTheme(saved);
     })();
     </script>
 
