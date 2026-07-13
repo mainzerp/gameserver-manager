@@ -6,7 +6,7 @@
 
 **Changed:**
 - Sidebar brand label renamed from "GameServer Manager" to "GSM".
-- Sidebar brand padding reduced so the bottom separator aligns with the top header bar.
+- Sidebar brand padding and icon size adjusted so the bottom separator aligns exactly with the top header bar.
 
 ### v2.10.1 -- Full-width Layout Fix
 
