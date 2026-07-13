@@ -1,6 +1,25 @@
 # Version History
 
-## Current Version: 2.6.2
+## Current Version: 2.7.0
+
+### v2.7.0 -- SteamCMD Backend & UX Improvements
+
+**Features and Improvements:**
+- Added dedicated Steam tab in server detail for Steam servers, consolidating Steam Information, SteamCMD settings, A2S_INFO status, and SteamCMD activity log
+- SteamCMD operations now show a persistent activity log with timestamped events in the new Steam tab
+- Added A2S_INFO server query integration to display live Steam server status (name, map, players, VAC) via the API v1 Steam status endpoint
+- Added Steam Guard TOTP auto-generation: encrypted TOTP shared secret storage and automatic 5-digit Steam Guard code generation for SteamCMD operations
+- Added API v1 Steam endpoints for update, validate, Steam Guard submission, and status
+- Added basic Steam RCON support so server commands are sent via RCON when enabled for Steam servers
+- Added query port tracking and conflict detection for Steam servers, with a configurable query port per server
+- Workshop items can now be previewed before adding via the Steam Web API on both the server detail Workshop tab and the full Workshop page
+- Updated SteamCMD to use the server's configured query port in generated launch commands
+- Added API v1 workshop preview endpoint and expanded test coverage for SteamCMD, A2S_INFO, API v1 Steam, and Steam RCON
+
+**Fixes:**
+- Fixed SteamCMD launch command for Enshrouded (app id 1604030) to include the correct server executable name
+- Steam account credentials are now encrypted at rest and decrypted only when needed for SteamCMD operations
+- Alembic migration path updated to include the steam_account model for future migration generation
 
 ### v2.6.2 -- Steam RAM Settings Edit
 
@@ -319,6 +338,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.6.2)
+## Recent Changes (since v2.7.0)
 
 None yet.
