@@ -1,6 +1,13 @@
 # Version History
 
-## Current Version: 2.7.1
+## Current Version: 2.7.2
+
+### v2.7.2 -- PostgreSQL Enum Migration Fix
+
+**Fixes:**
+- Fixed `b13_01_query_port` migration to use uppercase enum literal `'STEAM'` instead of lowercase `'steam'` for PostgreSQL, matching how SQLAlchemy stores enum member names.
+- Made the container HTTPS host port configurable via `GSM_HOST_PORT` in `.env` (defaults to 8443) so deployments can avoid Windows reserved port ranges.
+- Added `host_port` to `app.config` so `GSM_HOST_PORT` in `.env` does not trigger Pydantic validation errors.
 
 ### v2.7.1 -- TemplateResponse Deprecation Fix
 
@@ -343,6 +350,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.7.1)
+## Recent Changes (since v2.7.2)
 
 None yet.

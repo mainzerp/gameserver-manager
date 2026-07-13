@@ -24,12 +24,12 @@ def upgrade() -> None:
     op.add_column("servers", sa.Column("query_port", sa.Integer(), nullable=True))
 
     # Populate query_port for existing Steam servers: game port + 1
-    # This keeps existing behavior and avoids NULL collisions in the port manager.
+    # Enum values are stored as uppercase names, so match 'STEAM'.
     if dialect == "sqlite":
-        op.execute("UPDATE servers SET query_port = port + 1 WHERE server_type = 'steam' AND query_port IS NULL")
+        op.execute("UPDATE servers SET query_port = port + 1 WHERE server_type = 'STEAM' AND query_port IS NULL")
     else:
         op.execute(
-            sa.text("UPDATE servers SET query_port = port + 1 WHERE server_type = 'steam' AND query_port IS NULL")
+            sa.text("UPDATE servers SET query_port = port + 1 WHERE server_type = 'STEAM' AND query_port IS NULL")
         )
 
 

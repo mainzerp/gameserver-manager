@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     postgres_db: str = ""
     postgres_user: str = ""
     postgres_password: str = ""
+    host_port: int = 8443
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="GSM_", extra="forbid")
 
