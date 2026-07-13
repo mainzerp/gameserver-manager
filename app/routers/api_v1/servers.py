@@ -400,3 +400,27 @@ async def api_steam_status(
             status_code=503,
         )
     return JSONResponse({"ok": True, "data": info})
+
+
+@router.get("/{server_id}/workshop/preview/{workshop_id}", summary="Preview workshop item")
+async def api_workshop_preview(
+    request: Request,
+    server_id: int,
+    workshop_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return Steam Workshop metadata for a preview before adding the item."""
+    await require_server_access(request, server_id, "view", db)
+    server = await db.get(Server, server_id)
+    if not server or server.server_type != ServerType.STEAM:
+        return JSONResponse({"ok": False, "error": "Steam server not found"}, status_code=404)
+
+    from app.services.steam_workshop import steam_workshop_service
+
+    metadata = await steam_workshop_service.fetch_metadata(workshop_id)
+    if not metadata:
+        return JSONResponse(
+            {"ok": False, "error": "Workshop item not found or Steam API key missing"},
+            status_code=404,
+        )
+    return JSONResponse({"ok": True, "data": metadata})

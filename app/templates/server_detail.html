@@ -96,6 +96,9 @@
     <button data-tab="console" id="tab-console" class="tab-btn">Console</button>
     <button data-tab="overview" id="tab-overview" class="tab-btn tab-btn-active">Overview</button>
     <button data-tab="settings" id="tab-settings" class="tab-btn">Settings</button>
+    {% if server.server_type.value == 'steam' %}
+    <button data-tab="steam" id="tab-steam" class="tab-btn">Steam</button>
+    {% endif %}
     {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
     <button data-tab="config" id="tab-config" class="tab-btn">Configuration</button>
     {% endif %}
@@ -338,9 +341,77 @@
     </div>
     {% endif %}
 
-    <!-- Steam Information -->
-    {% if server.server_type.value == 'steam' %}
+    <!-- Recent Events -->
+    {% if recent_events %}
     <div class="card mb-6 mt-6">
+        <div class="card-header">Recent Events</div>
+        <div class="card-body">
+            <div class="space-y-2 text-sm">
+                {% for event in recent_events %}
+                <div class="flex items-center justify-between py-1" {% if not loop.last %}style="border-bottom: 1px solid var(--clr-border);"{% endif %}>
+                    <span style="color: var(--clr-text-primary);">{{ event.action }}</span>
+                    <span class="text-xs font-mono" style="color: var(--clr-text-muted);">{{ event.timestamp.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================== -->
+<!-- TAB: Steam                     -->
+<!-- ============================== -->
+<div id="panel-steam" class="tab-panel hidden">
+    <!-- Steam Status (A2S_INFO) -->
+    <div class="card mb-6">
+        <div class="card-header flex items-center justify-between">
+            <span>Steam Server Status</span>
+            <button type="button" data-action="refreshSteamStatus" class="btn btn-secondary btn-sm">Refresh</button>
+        </div>
+        <div class="card-body">
+            <div id="steam-status-loading" class="text-sm" style="color:var(--clr-text-muted);">Loading...</div>
+            <div id="steam-status-content" class="hidden space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Name</span>
+                    <span id="steam-status-name" style="color:var(--clr-text-primary);" class="font-medium"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Map</span>
+                    <span id="steam-status-map" style="color:var(--clr-text-primary);" class="font-mono"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Game</span>
+                    <span id="steam-status-game" style="color:var(--clr-text-primary);"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Players</span>
+                    <span id="steam-status-players" style="color:var(--clr-text-primary);"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">VAC</span>
+                    <span id="steam-status-vac" style="color:var(--clr-text-primary);"></span>
+                </div>
+            </div>
+            <div id="steam-status-error" class="hidden text-sm" style="color:var(--clr-danger);">Server not responding to A2S query.</div>
+        </div>
+    </div>
+
+    <!-- SteamCMD Activity Log -->
+    <div class="card mb-6">
+        <div class="card-header flex items-center justify-between">
+            <span>SteamCMD Activity Log</span>
+            <button type="button" data-action="clearSteamActivityLog" class="btn btn-secondary btn-sm">Clear</button>
+        </div>
+        <div class="card-body">
+            <div id="steam-activity-log" class="text-sm font-mono p-3 rounded" style="background: var(--console-bg); color: var(--clr-text-secondary); max-height: 300px; overflow-y: auto;">
+                <p id="steam-activity-empty" class="text-xs" style="color: var(--clr-text-muted);">No recent SteamCMD activity.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Steam Information & Settings -->
+    <div class="card mb-6">
         <div class="card-header flex items-center justify-between">
             <span>Steam Information</span>
             <div class="flex gap-2">
@@ -447,7 +518,7 @@
                             <label class="flex items-center gap-2 text-sm">
                                 <input type="hidden" name="clear_steam_gslt" value="false">
                                 <input type="checkbox" name="clear_steam_gslt" value="true" class="w-4 h-4 rounded">
-                                Clear saved GMod GSLT
+                                Clear saved GSLT
                             </label>
                         </div>
                     </div>
@@ -471,9 +542,10 @@
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 
+<!-- ============================== -->
+<!-- TAB: Settings                  -->
 <!-- ============================== -->
 <!-- TAB: Settings                  -->
 <!-- ============================== -->
@@ -1590,15 +1662,37 @@
             <a href="/servers/{{ server.id }}/workshop" class="btn btn-secondary btn-sm">Full Workshop Page</a>
         </div>
         <div class="card-body">
-            <!-- Add Workshop Item -->
-            <form action="/servers/{{ server.id }}/workshop/add" method="post" class="flex gap-2 mb-4">
+    <!-- Add Workshop Item -->
+    <div class="card mb-6">
+        <div class="card-header">Add Workshop Item</div>
+        <div class="card-body">
+            <form id="workshop-add-form-{{ server.id }}" action="/servers/{{ server.id }}/workshop/add" method="post" class="space-y-3">
                 {{ csrf_field(request) }}
-                <input type="text" name="workshop_id" placeholder="Workshop Item ID" class="input-field" style="width:auto;flex:1;" required>
-                <button type="submit" class="btn btn-primary btn-sm">Add Item</button>
+                <div class="flex gap-3 items-end">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium mb-2" for="workshop_id">Workshop Item ID</label>
+                        <input type="text" id="workshop_id" name="workshop_id" placeholder="e.g. 1234567890" class="input-field" required>
+                    </div>
+                    <button type="button" data-action="previewWorkshop" data-server-id="{{ server.id }}" class="btn btn-secondary btn-sm">Preview</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Add Item</button>
+                </div>
+                <div id="workshop-preview" class="hidden p-3 rounded-lg" style="background: var(--clr-bg-secondary); border: 1px solid var(--clr-border);">
+                    <div class="flex gap-4">
+                        <img id="workshop-preview-image" src="" alt="" class="w-24 h-24 object-cover rounded hidden">
+                        <div class="flex-1">
+                            <p id="workshop-preview-title" class="font-medium" style="color: var(--clr-text-primary);"></p>
+                            <p id="workshop-preview-description" class="text-xs mt-1" style="color: var(--clr-text-secondary);"></p>
+                            <p id="workshop-preview-meta" class="text-xs mt-2" style="color: var(--clr-text-muted);"></p>
+                        </div>
+                    </div>
+                    <p id="workshop-preview-error" class="hidden text-sm" style="color: var(--clr-danger);"></p>
+                </div>
             </form>
+        </div>
+    </div>
 
-            {% if workshop_items %}
-            <div class="overflow-x-auto">
+    {% if workshop_items %}
+    <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
                         <tr style="border-bottom: 1px solid var(--clr-border);">
@@ -2031,6 +2125,30 @@ function buildModCard(mod) {
         } else {
             progressWrap.classList.add('hidden');
         }
+
+        logSteamActivity('[' + (event.operation || 'SteamCMD') + '] ' + (event.message || currentStatus), currentStatus);
+    }
+
+    function logSteamActivity(text, kind) {
+        var log = document.getElementById('steam-activity-log');
+        if (!log) return;
+        var empty = document.getElementById('steam-activity-empty');
+        if (empty) empty.remove();
+        var line = document.createElement('div');
+        line.className = 'console-line py-1';
+        var color = 'var(--clr-text-secondary)';
+        if (kind === 'completed') color = 'var(--clr-success)';
+        else if (kind === 'failed') color = 'var(--clr-danger)';
+        else if (kind === 'waiting_for_steam_guard') color = 'var(--clr-warning)';
+        else if (kind === 'running') color = 'var(--clr-accent)';
+        line.style.color = color;
+        var time = document.createElement('span');
+        time.style.color = 'var(--clr-text-muted)';
+        time.textContent = new Date().toLocaleTimeString() + ' ';
+        line.appendChild(time);
+        line.appendChild(document.createTextNode(text));
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
     }
 
     function connect() {
@@ -2095,6 +2213,105 @@ function buildModCard(mod) {
             });
     });
 
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.getAttribute('data-action') === 'refreshSteamStatus') {
+            loadSteamStatus();
+        }
+        if (e.target && e.target.getAttribute('data-action') === 'clearSteamActivityLog') {
+            var log = document.getElementById('steam-activity-log');
+            if (log) log.innerHTML = '<p id="steam-activity-empty" class="text-xs" style="color: var(--clr-text-muted);">No recent SteamCMD activity.</p>';
+        }
+        if (e.target && e.target.getAttribute('data-action') === 'previewWorkshop') {
+            previewWorkshop(e.target);
+        }
+    });
+
+    function previewWorkshop(button) {
+        var serverId = button.getAttribute('data-server-id');
+        var form = document.getElementById('workshop-add-form-' + serverId);
+        var input = form.querySelector('input[name="workshop_id"]');
+        var workshopId = input.value.trim();
+        var preview = document.getElementById('workshop-preview');
+        var title = document.getElementById('workshop-preview-title');
+        var desc = document.getElementById('workshop-preview-description');
+        var meta = document.getElementById('workshop-preview-meta');
+        var img = document.getElementById('workshop-preview-image');
+        var error = document.getElementById('workshop-preview-error');
+        if (!workshopId) return;
+        preview.classList.remove('hidden');
+        title.textContent = 'Loading...';
+        desc.textContent = '';
+        meta.textContent = '';
+        img.classList.add('hidden');
+        error.classList.add('hidden');
+        fetch('/api/v1/servers/' + serverId + '/workshop/preview/' + workshopId)
+            .then(function(r) { return r.json(); })
+            .then(function(payload) {
+                if (!payload.ok || !payload.data) {
+                    title.textContent = '';
+                    error.textContent = payload.error || 'Preview failed.';
+                    error.classList.remove('hidden');
+                    return;
+                }
+                var data = payload.data;
+                title.textContent = data.name || 'Unknown';
+                desc.textContent = data.description || '';
+                var metaText = [];
+                if (data.file_size) metaText.push('Size: ' + formatBytes(data.file_size));
+                if (data.subscriptions) metaText.push('Subscribers: ' + data.subscriptions);
+                if (data.last_updated) metaText.push('Updated: ' + data.last_updated);
+                meta.textContent = metaText.join(' / ');
+                if (data.preview_url) {
+                    img.src = data.preview_url;
+                    img.classList.remove('hidden');
+                }
+            })
+            .catch(function() {
+                title.textContent = '';
+                error.textContent = 'Preview failed.';
+                error.classList.remove('hidden');
+            });
+    }
+
+    function formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function loadSteamStatus() {
+        var loading = document.getElementById('steam-status-loading');
+        var content = document.getElementById('steam-status-content');
+        var error = document.getElementById('steam-status-error');
+        if (!loading || !content || !error) return;
+        loading.classList.remove('hidden');
+        content.classList.add('hidden');
+        error.classList.add('hidden');
+        fetch('/api/v1/servers/{{ server.id }}/steam/status')
+            .then(function(r) { return r.json(); })
+            .then(function(payload) {
+                loading.classList.add('hidden');
+                if (!payload.ok || !payload.data) {
+                    error.classList.remove('hidden');
+                    return;
+                }
+                var info = payload.data;
+                document.getElementById('steam-status-name').textContent = info.name || 'Unknown';
+                document.getElementById('steam-status-map').textContent = info.map || 'Unknown';
+                document.getElementById('steam-status-game').textContent = info.game || 'Unknown';
+                document.getElementById('steam-status-players').textContent = (info.players || 0) + ' / ' + (info.max_players || 0);
+                document.getElementById('steam-status-vac').textContent = info.vac ? 'Enabled' : 'Disabled';
+                content.classList.remove('hidden');
+            })
+            .catch(function() {
+                loading.classList.add('hidden');
+                error.classList.remove('hidden');
+            });
+    }
+
+    loadSteamStatus();
     connect();
 })();
 </script>

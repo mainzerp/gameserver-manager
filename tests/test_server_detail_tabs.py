@@ -165,12 +165,18 @@ class ServerDetailTabVisibilityTests(unittest.IsolatedAsyncioTestCase):
         self.check_update_mock.assert_not_awaited()
         self.assertNotIn('id="tab-mods"', response.text)
         self.assertNotIn('id="panel-mods"', response.text)
+        self.assertIn('id="tab-steam"', response.text)
+        self.assertIn('id="panel-steam"', response.text)
         self.assertIn('id="tab-workshop"', response.text)
         self.assertIn('id="panel-workshop"', response.text)
         self.assertIn('id="check-update-btn"', response.text)
         self.assertNotIn("Update available: Build", response.text)
         self.assertIn("getAvailableTabs", response.text)
         self.assertIn("availableTabs.indexOf(urlTab)", response.text)
+        self.assertIn("data-action=\"refreshSteamStatus\"", response.text)
+        self.assertIn("steam-activity-log", response.text)
+        self.assertNotIn('id="tab-mods"', response.text)
+        self.assertNotIn('id="panel-mods"', response.text)
 
     async def test_minecraft_server_hides_workshop_and_keeps_mods(self):
         server = await self._create_server(

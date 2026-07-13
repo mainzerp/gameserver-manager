@@ -132,7 +132,6 @@ class SteamApiV1Tests(unittest.IsolatedAsyncioTestCase):
         data = response.json()
         assert data["ok"] is True
         mock_submit.assert_awaited_once_with(server.id, "op-123", "12345")
-
     async def test_steam_status_endpoint_returns_info(self):
         server = await self._create_server()
         with patch.object(
@@ -145,6 +144,33 @@ class SteamApiV1Tests(unittest.IsolatedAsyncioTestCase):
         data = response.json()
         assert data["ok"] is True
         assert data["data"]["players"] == 5
+
+    async def test_workshop_preview_endpoint_returns_metadata(self):
+        server = await self._create_server()
+        with patch(
+            "app.services.steam_workshop.SteamWorkshopService.fetch_metadata",
+            AsyncMock(return_value={"name": "Cool Map", "file_size": 1024}),
+        ):
+            response = await self.client.get(
+                f"/servers/{server.id}/workshop/preview/1234567890"
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ok"] is True
+        assert data["data"]["name"] == "Cool Map"
+
+    async def test_workshop_preview_endpoint_not_found(self):
+        server = await self._create_server()
+        with patch(
+            "app.services.steam_workshop.SteamWorkshopService.fetch_metadata",
+            AsyncMock(return_value=None),
+        ):
+            response = await self.client.get(
+                f"/servers/{server.id}/workshop/preview/1234567890"
+            )
+        assert response.status_code == 404
+        data = response.json()
+        assert data["ok"] is False
 
 
 if __name__ == "__main__":

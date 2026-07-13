@@ -50,16 +50,30 @@
 <div class="card mb-6">
     <div class="card-header">Add Workshop Item</div>
     <div class="card-body">
-        <form action="/servers/{{ server.id }}/workshop/add" method="post" class="flex gap-3 items-end">
+        <form id="workshop-add-form-{{ server.id }}" action="/servers/{{ server.id }}/workshop/add" method="post" class="space-y-3">
             {{ csrf_field(request) }}
-            <div class="flex-1">
-                <label class="block text-sm font-medium mb-2" for="workshop_id">Workshop Item ID</label>
-                <input type="text" id="workshop_id" name="workshop_id" placeholder="e.g. 1234567890" class="input-field" required>
-                <p class="text-xs mt-1" style="color: var(--clr-text-muted);">
-                    Find item IDs on the Steam Workshop page for the game.
-                </p>
+            <div class="flex gap-3 items-end">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium mb-2" for="workshop_id">Workshop Item ID</label>
+                    <input type="text" id="workshop_id" name="workshop_id" placeholder="e.g. 1234567890" class="input-field" required>
+                    <p class="text-xs mt-1" style="color: var(--clr-text-muted);">
+                        Find item IDs on the Steam Workshop page for the game.
+                    </p>
+                </div>
+                <button type="button" data-action="previewWorkshop" data-server-id="{{ server.id }}" class="btn btn-secondary">Preview</button>
+                <button type="submit" class="btn btn-primary">Add Item</button>
             </div>
-            <button type="submit" class="btn btn-primary">Add Item</button>
+            <div id="workshop-preview" class="hidden p-3 rounded-lg" style="background: var(--clr-bg-secondary); border: 1px solid var(--clr-border);">
+                <div class="flex gap-4">
+                    <img id="workshop-preview-image" src="" alt="" class="w-24 h-24 object-cover rounded hidden">
+                    <div class="flex-1">
+                        <p id="workshop-preview-title" class="font-medium" style="color: var(--clr-text-primary);"></p>
+                        <p id="workshop-preview-description" class="text-xs mt-1" style="color: var(--clr-text-secondary);"></p>
+                        <p id="workshop-preview-meta" class="text-xs mt-2" style="color: var(--clr-text-muted);"></p>
+                    </div>
+                </div>
+                <p id="workshop-preview-error" class="hidden text-sm" style="color: var(--clr-danger);"></p>
+            </div>
         </form>
     </div>
 </div>
@@ -154,44 +168,101 @@
 {% block scripts %}
 <script nonce="{{ request.state.csp_nonce }}">
 (function() {
-    const panel = document.getElementById('steam-operation-panel');
-    const label = document.getElementById('steam-operation-label');
-    const message = document.getElementById('steam-operation-message');
-    const status = document.getElementById('steam-operation-status');
-    const progressWrap = document.getElementById('steam-operation-progress');
-    const progressBar = document.getElementById('steam-operation-progress-bar');
-    const progressText = document.getElementById('steam-operation-progress-text');
-    const guardForm = document.getElementById('steam-guard-form');
-    const guardOperationId = document.getElementById('steam-guard-operation-id');
-    const guardInput = document.getElementById('steam-guard-code');
-    const guardFeedback = document.getElementById('steam-guard-feedback');
-    const csrfField = document.querySelector('input[name="csrf_token"]');
-    const csrfToken = csrfField ? csrfField.value : '';
-    const labels = {
+    function formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function previewWorkshop(button) {
+        var serverId = button.getAttribute('data-server-id');
+        var form = document.getElementById('workshop-add-form-' + serverId);
+        var input = form.querySelector('input[name="workshop_id"]');
+        var workshopId = input.value.trim();
+        var preview = document.getElementById('workshop-preview');
+        var title = document.getElementById('workshop-preview-title');
+        var desc = document.getElementById('workshop-preview-description');
+        var meta = document.getElementById('workshop-preview-meta');
+        var img = document.getElementById('workshop-preview-image');
+        var error = document.getElementById('workshop-preview-error');
+        if (!workshopId) return;
+        preview.classList.remove('hidden');
+        title.textContent = 'Loading...';
+        desc.textContent = '';
+        meta.textContent = '';
+        img.classList.add('hidden');
+        error.classList.add('hidden');
+        fetch('/api/v1/servers/' + serverId + '/workshop/preview/' + workshopId)
+            .then(function(r) { return r.json(); })
+            .then(function(payload) {
+                if (!payload.ok || !payload.data) {
+                    title.textContent = '';
+                    error.textContent = payload.error || 'Preview failed.';
+                    error.classList.remove('hidden');
+                    return;
+                }
+                var data = payload.data;
+                title.textContent = data.name || 'Unknown';
+                desc.textContent = data.description || '';
+                var metaText = [];
+                if (data.file_size) metaText.push('Size: ' + formatBytes(data.file_size));
+                if (data.subscriptions) metaText.push('Subscribers: ' + data.subscriptions);
+                if (data.last_updated) metaText.push('Updated: ' + data.last_updated);
+                meta.textContent = metaText.join(' / ');
+                if (data.preview_url) {
+                    img.src = data.preview_url;
+                    img.classList.remove('hidden');
+                }
+            })
+            .catch(function() {
+                title.textContent = '';
+                error.textContent = 'Preview failed.';
+                error.classList.remove('hidden');
+            });
+    }
+
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.getAttribute('data-action') === 'previewWorkshop') {
+            previewWorkshop(e.target);
+        }
+    });
+})();
+</script>
+<script nonce="{{ request.state.csp_nonce }}">
+(function() {
+    var panel = document.getElementById('steam-operation-panel');
+    var label = document.getElementById('steam-operation-label');
+    var message = document.getElementById('steam-operation-message');
+    var status = document.getElementById('steam-operation-status');
+    var progressWrap = document.getElementById('steam-operation-progress');
+    var progressBar = document.getElementById('steam-operation-progress-bar');
+    var progressText = document.getElementById('steam-operation-progress-text');
+    var guardForm = document.getElementById('steam-guard-form');
+    var guardOperationId = document.getElementById('steam-guard-operation-id');
+    var guardInput = document.getElementById('steam-guard-code');
+    var guardFeedback = document.getElementById('steam-guard-feedback');
+    var csrfField = document.querySelector('input[name="csrf_token"]');
+    var csrfToken = csrfField ? csrfField.value : '';
+    var labels = {
         install: 'Steam Install',
         update: 'Steam Update',
         validate: 'Steam Validate',
         workshop_install: 'Workshop Install',
         workshop_update: 'Workshop Update'
     };
-    let reconnectTimer = null;
-    let lastState = null;
+    var reconnectTimer = null;
+    var lastState = null;
 
     function setStatusBadge(kind, text) {
         status.className = 'badge';
-        if (kind === 'completed') {
-            status.classList.add('badge-success');
-        } else if (kind === 'failed') {
-            status.classList.add('badge-danger');
-        } else if (kind === 'waiting') {
-            status.classList.add('badge-warning');
-        } else if (kind === 'queued') {
-            status.classList.add('badge-neutral');
-        } else if (kind === 'running') {
-            status.classList.add('badge-info');
-        } else {
-            status.classList.add('badge-neutral');
-        }
+        if (kind === 'completed') status.classList.add('badge-success');
+        else if (kind === 'failed') status.classList.add('badge-danger');
+        else if (kind === 'waiting') status.classList.add('badge-warning');
+        else if (kind === 'queued') status.classList.add('badge-neutral');
+        else if (kind === 'running') status.classList.add('badge-info');
+        else status.classList.add('badge-neutral');
         status.textContent = text;
     }
 
@@ -211,10 +282,8 @@
     }
 
     function applyState(event) {
-        if (!event || event.type === 'heartbeat') {
-            return;
-        }
-        const currentStatus = event.status || event.type || 'idle';
+        if (!event || event.type === 'heartbeat') return;
+        var currentStatus = event.status || event.type || 'idle';
         lastState = event;
 
         if (event.type === 'snapshot' && currentStatus === 'idle') {
@@ -245,7 +314,7 @@
         }
 
         if (currentStatus === 'queued' || currentStatus === 'running' || currentStatus === 'completed' || currentStatus === 'waiting_for_steam_guard') {
-            const percent = typeof event.percent === 'number' ? event.percent : 0;
+            var percent = typeof event.percent === 'number' ? event.percent : 0;
             progressWrap.classList.remove('hidden');
             progressBar.style.width = Math.max(0, Math.min(percent, 100)) + '%';
             progressText.textContent = Math.round(percent) + '%';
@@ -259,8 +328,8 @@
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
         }
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const socket = new WebSocket(proto + '//' + location.host + '/ws/steamcmd/{{ server.id }}');
+        var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var socket = new WebSocket(proto + '//' + location.host + '/ws/steamcmd/{{ server.id }}');
 
         socket.onmessage = function(event) {
             applyState(JSON.parse(event.data));
@@ -278,19 +347,17 @@
 
     guardForm.addEventListener('submit', function(event) {
         event.preventDefault();
-        const operationId = guardOperationId.value;
-        const code = guardInput.value.trim();
+        var operationId = guardOperationId.value;
+        var code = guardInput.value.trim();
         if (!operationId || !code) {
             updateGuardState(true, 'Steam Guard code is required.', 'var(--clr-danger)');
             return;
         }
 
-        const formData = new FormData();
+        var formData = new FormData();
         formData.append('operation_id', operationId);
         formData.append('steam_guard_code', code);
-        if (csrfToken) {
-            formData.append('csrf_token', csrfToken);
-        }
+        if (csrfToken) formData.append('csrf_token', csrfToken);
 
         fetch('/servers/{{ server.id }}/steam/guard', {
             method: 'POST',
