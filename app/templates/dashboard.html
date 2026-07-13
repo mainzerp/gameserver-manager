@@ -234,8 +234,8 @@
         <!-- Metadata Line -->
         <div class="text-xs mb-4 truncate" style="color: var(--clr-text-muted);">
             {{ server.server_type.value | replace("_", " ") | title }}
-            {% if server.mc_version %} | {{ server.mc_version }}{% endif %}
-            {% if server.loader %} | {{ server.loader | title }}{% endif %}
+            {% if server.mc_version and server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %} | {{ server.mc_version }}{% endif %}
+            {% if server.loader and server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %} | {{ server.loader | title }}{% endif %}
             | Port {{ server.port }}
             {% if update_counts.get(server.id, 0) > 0 %}
             <span class="ml-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium" style="background: var(--clr-warning); color: #fff;">{{ update_counts[server.id] }} mod update{{ 's' if update_counts[server.id] != 1 else '' }}</span>

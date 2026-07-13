@@ -182,7 +182,17 @@
         </style>
         <div class="console-output p-4" id="console-output">
             {% for line in logs %}
-            <div>{{ line }}</div>
+            {% set lower_line = line | lower %}
+            {% if '[error]' in lower_line or '[fatal]' in lower_line or '/error' in lower_line or '/fatal' in lower_line %}
+                {% set level = 'error' %}
+            {% elif '[warn]' in lower_line or '[warning]' in lower_line or '/warn' in lower_line %}
+                {% set level = 'warn' %}
+            {% elif '[debug]' in lower_line or '/debug' in lower_line %}
+                {% set level = 'debug' %}
+            {% else %}
+                {% set level = 'info' %}
+            {% endif %}
+            <div class="console-line" data-level="{{ level }}">{{ line }}</div>
             {% endfor %}
         </div>
         <!-- Saved Command Shortcuts -->

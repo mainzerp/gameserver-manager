@@ -1093,12 +1093,20 @@ async def server_detail(
     managed_javas = []
     if server.mc_version and server.server_type == ServerType.MINECRAFT_JAVA:
         required_java_version = get_required_java_version(server.mc_version)
-        from app.services.java_manager import get_managed_java_path, list_managed_javas
+        from app.services.java_manager import (
+            detect_java_version,
+            find_java_for_mc,
+            list_managed_javas,
+        )
 
         managed_javas = list_managed_javas()
-        # Check if current java_path is likely to work
-        managed = get_managed_java_path(required_java_version)
-        if server.java_path == "java" and not managed:
+        detected = await detect_java_version(server.java_path)
+        if detected is not None:
+            java_compatible = detected >= required_java_version
+        elif server.java_path == "java":
+            java_info = await find_java_for_mc(server.mc_version)
+            java_compatible = java_info.get("compatible", False)
+        else:
             java_compatible = False
 
     # Mod update counts

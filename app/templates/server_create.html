@@ -8,32 +8,23 @@
 {% endblock %}
 
 {% block content %}
+<!-- Page Header -->
 <div class="mb-6">
-    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">Create New Server</h1>
+    <h1 class="text-2xl font-bold" style="color: var(--clr-text-primary);">New Server</h1>
+    <p class="text-sm mt-1" style="color: var(--clr-text-secondary);">Create a new server, upload an existing one, or import a configuration.</p>
 </div>
 
-<!-- Upload ZIP -->
-<div class="card mb-6 max-w-2xl">
-    <div class="card-header">Upload Server ZIP</div>
-    <div class="card-body">
-        <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">Upload a .zip archive of an existing server directory to extract and register it automatically.</p>
-        <a href="/servers/upload-zip" class="btn btn-secondary btn-sm">Upload ZIP</a>
+<!-- Mode Selector -->
+<div class="card mb-6 max-w-2xl p-1">
+    <div class="tab-nav" style="border-bottom: none;" id="create-mode-tabs">
+        <button type="button" data-mode="create" class="tab-btn tab-btn-active flex-1 text-center">Create New Server</button>
+        <button type="button" data-mode="upload" class="tab-btn flex-1 text-center">Upload Existing Server</button>
+        <button type="button" data-mode="import" class="tab-btn flex-1 text-center">Import from Config</button>
     </div>
 </div>
 
-<!-- Import from Config -->
-<div class="card mb-6 max-w-2xl">
-    <div class="card-header">Import from Config</div>
-    <div class="card-body">
-        <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">Import a previously exported server configuration JSON file.</p>
-        <form method="post" action="/servers/import-config" enctype="multipart/form-data" class="flex items-center gap-3">
-            {{ csrf_field(request) }}
-            <input type="file" name="file" accept=".json" class="input-field" style="width:auto;">
-            <button type="submit" class="btn btn-secondary btn-sm">Import Config</button>
-        </form>
-    </div>
-</div>
-
+<!-- Panel: Create New Server -->
+<div id="panel-create" class="create-mode-panel">
 <form action="/servers/create" method="post" class="max-w-2xl">
     {{ csrf_field(request) }}
     <div class="card p-6 space-y-6">
@@ -403,6 +394,33 @@
         </button>
     </div>
 </form>
+</div>
+
+<!-- Panel: Upload Existing Server -->
+<div id="panel-upload" class="create-mode-panel hidden">
+    <div class="card mb-6 max-w-2xl">
+        <div class="card-header">Upload Server ZIP</div>
+        <div class="card-body">
+            <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">Upload a .zip archive of an existing server directory to extract and register it automatically.</p>
+            <a href="/servers/upload-zip" class="btn btn-secondary btn-sm">Open Upload Form</a>
+        </div>
+    </div>
+</div>
+
+<!-- Panel: Import from Config -->
+<div id="panel-import" class="create-mode-panel hidden">
+    <div class="card mb-6 max-w-2xl">
+        <div class="card-header">Import from Config</div>
+        <div class="card-body">
+            <p class="text-sm mb-3" style="color: var(--clr-text-secondary);">Import a previously exported server configuration JSON file.</p>
+            <form method="post" action="/servers/import-config" enctype="multipart/form-data" class="flex items-center gap-3">
+                {{ csrf_field(request) }}
+                <input type="file" name="file" accept=".json" class="input-field" style="width:auto;">
+                <button type="submit" class="btn btn-secondary btn-sm">Import Config</button>
+            </form>
+        </div>
+    </div>
+</div>
 
 <script nonce="{{ request.state.csp_nonce }}">
 function toggleRcon() {
@@ -423,15 +441,25 @@ function toggleFields() {
     const mcFields = document.getElementById('mc-fields');
     const steamFields = document.getElementById('steam-fields');
     const javaOnlyFields = document.querySelectorAll('.java-only-field');
+    const mcVersion = document.getElementById('mc_version');
+    const loader = document.getElementById('loader');
+    const loaderVersion = document.getElementById('loader_version');
 
     if (type === 'steam') {
         mcFields.classList.add('hidden');
         steamFields.classList.remove('hidden');
+        // Disable Minecraft fields so they are not submitted for Steam servers
+        if (mcVersion) mcVersion.disabled = true;
+        if (loader) loader.disabled = true;
+        if (loaderVersion) loaderVersion.disabled = true;
         // Set port from selected steam app or default 27015
         onSteamAppChange();
     } else {
         mcFields.classList.remove('hidden');
         steamFields.classList.add('hidden');
+        if (mcVersion) mcVersion.disabled = false;
+        if (loader) loader.disabled = false;
+        if (loaderVersion) loaderVersion.disabled = false;
         document.getElementById('port').value = type === 'minecraft_bedrock' ? '19132' : '25565';
     }
 
@@ -704,6 +732,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var anonCb = document.getElementById('steam_login_anonymous');
     if (anonCb) { anonCb.addEventListener('change', toggleSteamAccountSection); }
+
+    // Mode tab switching (Create / Upload / Import)
+    var modeTabButtons = document.querySelectorAll('#create-mode-tabs [data-mode]');
+    var modePanels = {
+        'create': document.getElementById('panel-create'),
+        'upload': document.getElementById('panel-upload'),
+        'import': document.getElementById('panel-import')
+    };
+    function switchMode(mode) {
+        modeTabButtons.forEach(function(btn) {
+            btn.classList.toggle('tab-btn-active', btn.dataset.mode === mode);
+        });
+        for (var key in modePanels) {
+            var panel = modePanels[key];
+            if (panel) {
+                panel.classList.toggle('hidden', key !== mode);
+            }
+        }
+    }
+    modeTabButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            switchMode(btn.dataset.mode);
+        });
+    });
+    // Default to create mode
+    switchMode('create');
 });
 </script>
 {% endblock %}

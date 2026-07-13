@@ -2,10 +2,15 @@
 
 ## Current Version: 2.7.7
 
-### v2.7.7 -- Header Badge Visibility Fix (Corrected)
+### v2.7.7 -- UI & Java Compatibility Fixes
 
 **Fixed:**
 - The `hidden` HTML attribute was still being overridden by `.badge { display: inline-flex }`. Now uses inline `style="display:none;"` and toggles `style.display` in JavaScript so the Steam operation badge is truly hidden when idle.
+- Java compatibility check in the server detail view now properly detects the Java version of `server.java_path` and falls back to `find_java_for_mc` when the path is `"java"`. Previously it only checked for managed Java installations, incorrectly showing "No compatible Java found" even when the system Java met the requirement.
+- Dashboard server cards no longer display `mc_version` or `loader` for Steam servers. These fields are Minecraft-only and were leaking onto Steam cards when a stale value was present in the database.
+- Initial server logs rendered in the Console tab are now emitted as `.console-line` elements with `data-level`, so the INFO/WARN/ERROR/DEBUG filters work immediately instead of only after WebSocket messages arrive or Load History is clicked.
+- Server create form disables `mc_version`, `loader` and `loader_version` when the type is switched to Steam, preventing stale Minecraft values from being submitted with a new Steam server.
+- New Server page (`/servers/create`) now uses a tab selector to switch between **Create New Server**, **Upload Existing Server**, and **Import from Config** instead of stacking all three options vertically. The selected mode is the only one visible, keeping the page focused.
 
 ### v2.7.6 -- Header Badge Visibility Fix
 
