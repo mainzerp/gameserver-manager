@@ -1,6 +1,11 @@
 # Version History
 
-## Current Version: 2.7.4
+## Current Version: 2.7.5
+
+### v2.7.5 -- Tab Switching Fix
+
+**Fixed:**
+- The `Steam` tab was missing from the client-side tab list in `server_detail.html`, causing the Steam panel to remain visible when switching to other tabs (e.g. Settings, Scheduler, Workshop, Backups, Files). Added `steam` to `allTabs` so the Steam tab now switches correctly.
 
 ### v2.7.4 -- Steam Operation UI Improvements
 
@@ -365,6 +370,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.7.4)
+## Recent Changes (since v2.7.5)
 
 None yet.
