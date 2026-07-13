@@ -1,6 +1,23 @@
 # Version History
 
-## Current Version: 2.8.0
+## Current Version: 2.9.0
+
+### v2.9.0 -- Phase 3 Detail Views Redesign
+
+**Added:**
+- New `.console-container`, `.console-input-area`, `.console-filter-btn` and `.console-line` component styles in `base.html` for a unified terminal aesthetic.
+- New `.timeline` component styles for event history.
+
+**Changed:**
+- Console tab redesigned: dark grid background, command prompt integrated at the bottom, log-level filter pills with active/dim states, and color-coded line borders using CSS variables.
+- Overview tab redesigned: the single "Quick Info Bar" row is now a grid of info cards (Type, Version, Max Compatible, Address, Uptime).
+- Recent Events list converted to a vertical timeline with accent dots.
+- Filter and auto-scroll buttons now toggle an `active` class for clearer visual state.
+- Tailwind CSS rebuilt to include new overview grid utilities.
+
+**Fixed:**
+- Console filter buttons no longer rely on hardcoded Tailwind colors; they use the warm palette's success/warning/danger/muted tokens.
+- Auto-scroll button now dims visually when turned off.
 
 ### v2.8.0 -- Phase 2 Core UI Redesign
 

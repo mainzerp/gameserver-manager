@@ -136,6 +136,84 @@
             overflow-y: auto;
             max-height: 400px;
         }
+        .console-container {
+            background: var(--console-bg);
+            border: 1px solid var(--clr-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+        .console-container .card-header {
+            border-bottom: 1px solid var(--clr-border);
+            background: var(--clr-panel);
+        }
+        .console-output {
+            background-image:
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .console-line {
+            padding: 2px 0;
+            word-break: break-all;
+        }
+        .console-line[data-level="info"] { color: var(--console-text); border-left: 3px solid transparent; padding-left: 12px; }
+        .console-line[data-level="warn"] { color: var(--clr-warning); border-left: 3px solid var(--clr-warning); padding-left: 8px; background: var(--clr-warning-bg); }
+        .console-line[data-level="error"] { color: var(--clr-danger); border-left: 3px solid var(--clr-danger); padding-left: 8px; background: var(--clr-danger-bg); }
+        .console-line[data-level="debug"] { color: var(--clr-text-muted); border-left: 3px solid var(--clr-text-muted); padding-left: 8px; opacity: 0.85; }
+        .console-input-area {
+            background: var(--clr-toolbar);
+            border-top: 1px solid var(--clr-border);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+        }
+        .console-input-area .prompt {
+            color: var(--clr-accent);
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-weight: 700;
+            margin-right: 8px;
+            user-select: none;
+        }
+        .console-input-area input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--clr-text-primary);
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 13px;
+            padding: 12px 0;
+            outline: none;
+        }
+        .console-input-area input::placeholder { color: var(--clr-text-muted); }
+        .console-input-area button {
+            color: var(--clr-accent);
+            font-weight: 600;
+            font-size: 13px;
+            padding: 12px 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+        }
+        .console-input-area button:hover { color: var(--clr-accent-hover); }
+        .console-filter-btn {
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            border: 1px solid var(--clr-border);
+            background: transparent;
+            color: var(--clr-text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        .console-filter-btn:hover { background: var(--clr-panel-hover); }
+        .console-filter-btn.active { background: var(--clr-accent-subtle); border-color: var(--clr-accent); color: var(--clr-accent); }
+        .console-filter-btn.level-info { border-left-color: var(--clr-success); }
+        .console-filter-btn.level-warn { border-left-color: var(--clr-warning); }
+        .console-filter-btn.level-error { border-left-color: var(--clr-danger); }
+        .console-filter-btn.level-debug { border-left-color: var(--clr-text-muted); }
 
         /* ===== Cards ===== */
         .card {
@@ -343,6 +421,38 @@
 
         .server-card-title { color: var(--clr-text-primary); transition: color var(--transition-fast); }
         .server-card:hover .server-card-title { color: var(--clr-accent); }
+
+        /* ===== Timeline ===== */
+        .timeline {
+            position: relative;
+            padding-left: 24px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 6px;
+            bottom: 6px;
+            width: 2px;
+            background: var(--clr-border);
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 16px;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -22px;
+            top: 6px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--clr-accent);
+            border: 2px solid var(--clr-panel);
+            box-shadow: 0 0 0 2px var(--clr-border);
+        }
+        .timeline-item:last-child { padding-bottom: 0; }
 
         /* ===== Utility Animations ===== */
         @keyframes fade-in {

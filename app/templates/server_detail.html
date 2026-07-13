@@ -142,7 +142,7 @@
 <!-- TAB: Console                   -->
 <!-- ============================== -->
 <div id="panel-console" class="tab-panel hidden">
-    <div class="card mb-6">
+    <div class="console-container mb-6">
         <div class="card-header flex items-center justify-between">
             <span>Console</span>
             <div class="flex items-center gap-3">
@@ -155,31 +155,25 @@
             </div>
         </div>
         <!-- Log Search -->
-        <div class="px-5 py-3" style="border-bottom:1px solid var(--clr-border);">
+        <div class="px-5 py-3" style="border-bottom:1px solid var(--clr-border); background: var(--clr-panel);">
             <form id="log-search-form" class="flex gap-2">
                 <input type="text" id="log-search-input" placeholder="Search logs..." class="input-field" style="width:auto;flex:1;">
                 <button type="submit" class="btn btn-primary btn-sm">Search</button>
                 <button type="button" id="clear-search-btn" class="btn btn-secondary btn-sm hidden">Clear</button>
             </form>
-            <div id="search-results" class="hidden mt-2 max-h-48 overflow-y-auto text-sm font-mono rounded p-2" style="background:var(--console-bg);color:var(--clr-warning);"></div>
+            <div id="search-results" class="hidden mt-2 max-h-48 overflow-y-auto text-sm font-mono rounded p-2" style="background:var(--console-bg);color:var(--clr-warning); border: 1px solid var(--clr-border);"></div>
         </div>
         <!-- Console Log Level Filters -->
-        <div class="px-5 py-2 flex flex-wrap items-center gap-2" style="border-bottom:1px solid var(--clr-border);">
-            <span class="text-xs font-medium" style="color:var(--clr-text-muted);">Filter:</span>
-            <button type="button" data-click-action="toggleLevel" data-click-arg="info" id="toggle-info" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #22c55e;">INFO</button>
-            <button type="button" data-click-action="toggleLevel" data-click-arg="warn" id="toggle-warn" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #eab308;">WARN</button>
-            <button type="button" data-click-action="toggleLevel" data-click-arg="error" id="toggle-error" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #ef4444;">ERROR</button>
-            <button type="button" data-click-action="toggleLevel" data-click-arg="debug" id="toggle-debug" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem; border-left: 3px solid #6b7280;">DEBUG</button>
+        <div class="px-5 py-2 flex flex-wrap items-center gap-2" style="border-bottom:1px solid var(--clr-border); background: var(--clr-toolbar);">
+            <span class="text-xs font-medium uppercase tracking-wider" style="color:var(--clr-text-muted);">Filter</span>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="info" id="toggle-info" class="console-filter-btn active level-info">Info</button>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="warn" id="toggle-warn" class="console-filter-btn active level-warn">Warn</button>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="error" id="toggle-error" class="console-filter-btn active level-error">Error</button>
+            <button type="button" data-click-action="toggleLevel" data-click-arg="debug" id="toggle-debug" class="console-filter-btn active level-debug">Debug</button>
             <div class="ml-auto">
-                <button type="button" data-action="toggleAutoScroll" id="toggle-scroll" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Auto-scroll: ON</button>
+                <button type="button" data-action="toggleAutoScroll" id="toggle-scroll" class="console-filter-btn active">Auto-scroll: ON</button>
             </div>
         </div>
-        <style>
-            .console-line[data-level="error"] { border-left: 3px solid #ef4444; padding-left: 8px; }
-            .console-line[data-level="warn"] { border-left: 3px solid #eab308; padding-left: 8px; }
-            .console-line[data-level="debug"] { border-left: 3px solid #6b7280; padding-left: 8px; opacity: 0.7; }
-            .console-line[data-level="info"] { border-left: 3px solid transparent; padding-left: 11px; }
-        </style>
         <div class="console-output p-4" id="console-output">
             {% for line in logs %}
             {% set lower_line = line | lower %}
@@ -196,31 +190,27 @@
             {% endfor %}
         </div>
         <!-- Saved Command Shortcuts -->
-        <div id="saved-commands-bar" class="px-5 py-2 flex flex-wrap gap-1 hidden" style="border-top:1px solid var(--clr-border);">
+        <div id="saved-commands-bar" class="px-5 py-2 flex flex-wrap gap-1 hidden" style="border-top:1px solid var(--clr-border); background: var(--clr-toolbar);">
         </div>
         <!-- Tab Completion Popup -->
         <div id="tab-complete-popup" class="hidden absolute z-50 rounded-lg shadow-lg p-2 text-xs max-h-48 overflow-y-auto" style="background:var(--clr-panel);border:1px solid var(--clr-border);"></div>
-        <form id="console-form" class="flex" style="border-top:1px solid var(--clr-border);position:relative;">
-            <span class="px-3 py-3" style="color:var(--clr-text-muted);">&gt;</span>
+        <form id="console-form" class="console-input-area">
+            <span class="prompt">&gt;</span>
             <input type="text" id="console-input" placeholder="Enter command..."
-                class="flex-1 py-3 pr-4 outline-none text-sm" style="background:transparent;color:var(--clr-text-primary);"
                 {% if not is_running %}disabled{% endif %}>
-            <button type="submit" class="px-4 py-3 text-sm font-medium" style="color:var(--clr-accent);">
-                Send
-            </button>
+            <button type="submit">Send</button>
         </form>
     </div>
 
     <!-- RCON Console -->
     {% if server.rcon_enabled %}
-    <div class="card mb-6">
+    <div class="console-container mb-6">
         <div class="card-header">RCON Console</div>
         <div class="console-output p-4" id="rcon-output" style="min-height:100px;max-height:200px;overflow-y:auto;color:var(--clr-warning);"></div>
-        <form id="rcon-form" class="flex" style="border-top:1px solid var(--clr-border);">
-            <span class="px-3 py-3" style="color:var(--clr-text-muted);">RCON&gt;</span>
-            <input type="text" id="rcon-input" placeholder="Enter RCON command..."
-                class="flex-1 py-3 pr-4 outline-none text-sm" style="background:transparent;color:var(--clr-text-primary);">
-            <button type="submit" class="px-4 py-3 text-sm font-medium" style="color:var(--clr-warning);">Send</button>
+        <form id="rcon-form" class="console-input-area">
+            <span class="prompt" style="color:var(--clr-warning);">RCON&gt;</span>
+            <input type="text" id="rcon-input" placeholder="Enter RCON command...">
+            <button type="submit" style="color:var(--clr-warning);">Send</button>
         </form>
     </div>
     {% endif %}
@@ -230,58 +220,58 @@
 <!-- TAB: Overview                  -->
 <!-- ============================== -->
 <div id="panel-overview" class="tab-panel">
-    <!-- Quick Info Bar -->
-    <div class="card mb-6">
-        <div class="card-body py-3">
-            <div class="flex flex-wrap items-center gap-6 text-sm">
-                <div class="flex items-center gap-2">
-                    <span style="color: var(--clr-text-muted);">Type:</span>
-                    <span style="color: var(--clr-text-primary);" class="font-medium">{{ server.server_type.value | replace("_", " ") | title }}</span>
-                </div>
-                {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] and server.mc_version %}
-                <div class="flex items-center gap-2">
-                    <span style="color: var(--clr-text-muted);">Version:</span>
-                    <span style="color: var(--clr-text-primary);" class="font-medium">{{ server.mc_version }}{% if server.loader %} ({{ server.loader | title }}){% endif %}</span>
-                </div>
+    <!-- Quick Info Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wider mb-1" style="color: var(--clr-text-muted);">Type</p>
+            <p class="text-sm font-semibold" style="color: var(--clr-text-primary);">{{ server.server_type.value | replace("_", " ") | title }}</p>
+        </div>
+        {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] and server.mc_version %}
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wider mb-1" style="color: var(--clr-text-muted);">Version</p>
+            <p class="text-sm font-semibold" style="color: var(--clr-text-primary);">{{ server.mc_version }}{% if server.loader %} <span class="text-xs font-normal" style="color: var(--clr-text-muted);">({{ server.loader | title }})</span>{% endif %}</p>
+        </div>
+        {% endif %}
+        {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wider mb-1" style="color: var(--clr-text-muted);">Max Compatible</p>
+            <div class="flex items-center gap-2">
+                {% if server.max_compatible_mc_version %}
+                <span class="text-sm font-semibold" style="color: var(--clr-success);">{{ server.max_compatible_mc_version }}</span>
+                {% else %}
+                <span class="text-xs" style="color:var(--clr-text-muted);">Not checked</span>
                 {% endif %}
-                {% if server.server_type.value in ['minecraft_java', 'minecraft_bedrock'] %}
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span style="color: var(--clr-text-muted);">Max Compatible:</span>
-                        {% if server.max_compatible_mc_version %}
-                        <span class="font-medium" style="color: var(--clr-success);">{{ server.max_compatible_mc_version }}</span>
-                        {% else %}
-                        <span class="text-xs" style="color:var(--clr-text-muted);">Not checked</span>
-                        {% endif %}
-                        <form action="/servers/{{ server.id }}/mods/refresh-max-version" method="post" class="inline">
-                            {{ csrf_field(request) }}
-                            <button class="text-xs" style="color:var(--clr-primary); background:none; border:none; cursor:pointer; padding:0;" title="Refresh now">&#x21bb;</button>
-                        </form>
-                    </div>
-                    {% if server.max_compatible_checked_at %}
-                    <p class="text-xs" style="color:var(--clr-text-muted);">Checked: {{ server.max_compatible_checked_at.strftime('%Y-%m-%d %H:%M') }}</p>
-                    {% endif %}
-                </div>
-                {% endif %}
-                <div class="flex items-center gap-2">
-                    <span style="color: var(--clr-text-muted);">Address:</span>
-                    <code id="server-address" style="color: var(--clr-text-primary);" class="font-mono text-xs">localhost:{{ server.port }}</code>
-                    <button type="button" id="copy-address-btn" class="text-xs font-medium" style="color: var(--clr-accent);">Copy</button>
-                    <button type="button" data-action="checkPort" class="text-xs font-medium" style="color: var(--clr-accent);">Test Port</button>
-                    <span id="port-result" class="text-xs font-medium"></span>
-                </div>
-                {% if uptime_seconds is not none %}
-                <div class="flex items-center gap-2">
-                    <span style="color: var(--clr-text-muted);">Uptime:</span>
-                    <span id="uptime-display" style="color: var(--clr-success);" class="font-medium">
-                        {% set hours = uptime_seconds // 3600 %}
-                        {% set minutes = (uptime_seconds % 3600) // 60 %}
-                        {{ hours }}h {{ minutes }}m
-                    </span>
-                </div>
-                {% endif %}
+                <form action="/servers/{{ server.id }}/mods/refresh-max-version" method="post" class="inline">
+                    {{ csrf_field(request) }}
+                    <button class="text-xs" style="color:var(--clr-accent); background:none; border:none; cursor:pointer; padding:0;" title="Refresh now">&#x21bb;</button>
+                </form>
+            </div>
+            {% if server.max_compatible_checked_at %}
+            <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Checked: {{ server.max_compatible_checked_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wider mb-1" style="color: var(--clr-text-muted);">Address</p>
+            <div class="flex items-center gap-2">
+                <code id="server-address" style="color: var(--clr-text-primary);" class="font-mono text-xs">localhost:{{ server.port }}</code>
+                <button type="button" id="copy-address-btn" class="text-xs font-medium" style="color: var(--clr-accent);">Copy</button>
+            </div>
+            <div class="flex items-center gap-2 mt-1">
+                <button type="button" data-action="checkPort" class="text-xs font-medium" style="color: var(--clr-accent);">Test Port</button>
+                <span id="port-result" class="text-xs font-medium"></span>
             </div>
         </div>
+        {% if uptime_seconds is not none %}
+        <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wider mb-1" style="color: var(--clr-text-muted);">Uptime</p>
+            <p id="uptime-display" class="text-sm font-semibold" style="color: var(--clr-success);">
+                {% set hours = uptime_seconds // 3600 %}
+                {% set minutes = (uptime_seconds % 3600) // 60 %}
+                {{ hours }}h {{ minutes }}m
+            </p>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Resource Monitoring -->
@@ -364,11 +354,11 @@
     <div class="card mb-6 mt-6">
         <div class="card-header">Recent Events</div>
         <div class="card-body">
-            <div class="space-y-2 text-sm">
+            <div class="timeline">
                 {% for event in recent_events %}
-                <div class="flex items-center justify-between py-1" {% if not loop.last %}style="border-bottom: 1px solid var(--clr-border);"{% endif %}>
-                    <span style="color: var(--clr-text-primary);">{{ event.action }}</span>
-                    <span class="text-xs font-mono" style="color: var(--clr-text-muted);">{{ event.timestamp.strftime('%d.%m.%Y %H:%M') }}</span>
+                <div class="timeline-item">
+                    <p class="text-sm font-medium" style="color: var(--clr-text-primary);">{{ event.action }}</p>
+                    <p class="text-xs font-mono mt-0.5" style="color: var(--clr-text-muted);">{{ event.timestamp.strftime('%d.%m.%Y %H:%M') }}</p>
                 </div>
                 {% endfor %}
             </div>
@@ -2442,12 +2432,15 @@ function getLogLevel(line) {
 
 var hiddenLevels = {};
 function toggleLevel(level) {
+    var btn = document.getElementById('toggle-' + level);
     if (hiddenLevels[level]) {
         delete hiddenLevels[level];
-        document.getElementById('toggle-' + level).style.opacity = '1';
+        btn.classList.add('active');
+        btn.style.opacity = '1';
     } else {
         hiddenLevels[level] = true;
-        document.getElementById('toggle-' + level).style.opacity = '0.4';
+        btn.classList.remove('active');
+        btn.style.opacity = '0.4';
     }
     document.querySelectorAll('.console-line[data-level="' + level + '"]').forEach(function(el) {
         el.style.display = hiddenLevels[level] ? 'none' : '';
@@ -2457,7 +2450,10 @@ function toggleLevel(level) {
 var autoScroll = true;
 function toggleAutoScroll() {
     autoScroll = !autoScroll;
-    document.getElementById('toggle-scroll').textContent = 'Auto-scroll: ' + (autoScroll ? 'ON' : 'OFF');
+    var btn = document.getElementById('toggle-scroll');
+    btn.textContent = 'Auto-scroll: ' + (autoScroll ? 'ON' : 'OFF');
+    btn.classList.toggle('active', autoScroll);
+    btn.style.opacity = autoScroll ? '1' : '0.4';
 }
 
 function createConsoleLine(text) {
