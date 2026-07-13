@@ -19,23 +19,28 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _pg_drop_fk(table: str, column: str):
-    """Drop an unnamed FK constraint on PostgreSQL by looking it up in information_schema."""
+    """Drop the FK constraint on a table.column by looking up its actual name.
+
+    Different schema generations name constraints differently (e.g.
+    ``fk_servers_steam_account_id`` vs ``servers_steam_account_id_fkey``),
+    so we resolve the name from information_schema instead of guessing.
+    """
     bind = op.get_bind()
     result = bind.execute(
         sa.text(
             """
-            SELECT constraint_name FROM information_schema.table_constraints
-            WHERE table_name = :table AND constraint_type = 'FOREIGN KEY'
-            AND constraint_name IN (
-                SELECT constraint_name FROM information_schema.constraint_column_usage
-                WHERE table_name = :ref_table AND column_name = :ref_col
-            )
+            SELECT tc.constraint_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+            WHERE tc.table_name = :table
+              AND tc.constraint_type = 'FOREIGN KEY'
+              AND kcu.column_name = :column
             """
         ),
-        {"table": table, "ref_table": "servers", "ref_col": "id"},
+        {"table": table, "column": column},
     )
-    rows = result.fetchall()
-    for row in rows:
+    for row in result.fetchall():
         op.drop_constraint(row[0], table, type_="foreignkey")
 
 
@@ -93,9 +98,7 @@ def upgrade() -> None:
     # PostgreSQL gets the constraints updated via drop/create.
     if dialect == "postgresql":
         # servers.steam_account_id -> SET NULL
-        op.drop_constraint(
-            "servers_steam_account_id_fkey", "servers", type_="foreignkey"
-        )
+        _pg_drop_fk("servers", "steam_account_id")
         op.create_foreign_key(
             None,
             "servers",
@@ -106,7 +109,7 @@ def upgrade() -> None:
         )
 
         # servers.node_id -> SET NULL
-        op.drop_constraint("servers_node_id_fkey", "servers", type_="foreignkey")
+        _pg_drop_fk("servers", "node_id")
         op.create_foreign_key(
             None,
             "servers",
@@ -117,7 +120,7 @@ def upgrade() -> None:
         )
 
         # backups.server_id -> CASCADE
-        op.drop_constraint("backups_server_id_fkey", "backups", type_="foreignkey")
+        _pg_drop_fk("backups", "server_id")
         op.create_foreign_key(
             None,
             "backups",
@@ -128,15 +131,13 @@ def upgrade() -> None:
         )
 
         # mods.server_id -> CASCADE
-        op.drop_constraint("mods_server_id_fkey", "mods", type_="foreignkey")
+        _pg_drop_fk("mods", "server_id")
         op.create_foreign_key(
             None, "mods", "servers", ["server_id"], ["id"], ondelete="CASCADE"
         )
 
         # scheduled_tasks.server_id -> CASCADE
-        op.drop_constraint(
-            "scheduled_tasks_server_id_fkey", "scheduled_tasks", type_="foreignkey"
-        )
+        _pg_drop_fk("scheduled_tasks", "server_id")
         op.create_foreign_key(
             None,
             "scheduled_tasks",
@@ -147,9 +148,7 @@ def upgrade() -> None:
         )
 
         # metric_snapshots.server_id -> CASCADE
-        op.drop_constraint(
-            "metric_snapshots_server_id_fkey", "metric_snapshots", type_="foreignkey"
-        )
+        _pg_drop_fk("metric_snapshots", "server_id")
         op.create_foreign_key(
             None,
             "metric_snapshots",
@@ -160,9 +159,7 @@ def upgrade() -> None:
         )
 
         # workshop_items.server_id -> CASCADE
-        op.drop_constraint(
-            "workshop_items_server_id_fkey", "workshop_items", type_="foreignkey"
-        )
+        _pg_drop_fk("workshop_items", "server_id")
         op.create_foreign_key(
             None,
             "workshop_items",
@@ -173,9 +170,7 @@ def upgrade() -> None:
         )
 
         # invite_links.server_id -> CASCADE
-        op.drop_constraint(
-            "invite_links_server_id_fkey", "invite_links", type_="foreignkey"
-        )
+        _pg_drop_fk("invite_links", "server_id")
         op.create_foreign_key(
             None,
             "invite_links",
@@ -186,7 +181,7 @@ def upgrade() -> None:
         )
 
         # api_keys.user_id -> CASCADE
-        op.drop_constraint("api_keys_user_id_fkey", "api_keys", type_="foreignkey")
+        _pg_drop_fk("api_keys", "user_id")
         op.create_foreign_key(
             None, "api_keys", "users", ["user_id"], ["id"], ondelete="CASCADE"
         )
@@ -223,43 +218,33 @@ def downgrade() -> None:
 
     # FK ondelete (PostgreSQL only)
     if dialect == "postgresql":
-        op.drop_constraint(
-            "servers_steam_account_id_fkey", "servers", type_="foreignkey"
-        )
+        _pg_drop_fk("servers", "steam_account_id")
         op.create_foreign_key(
             None, "servers", "steam_accounts", ["steam_account_id"], ["id"]
         )
 
-        op.drop_constraint("servers_node_id_fkey", "servers", type_="foreignkey")
+        _pg_drop_fk("servers", "node_id")
         op.create_foreign_key(None, "servers", "nodes", ["node_id"], ["id"])
 
-        op.drop_constraint("backups_server_id_fkey", "backups", type_="foreignkey")
+        _pg_drop_fk("backups", "server_id")
         op.create_foreign_key(None, "backups", "servers", ["server_id"], ["id"])
 
-        op.drop_constraint("mods_server_id_fkey", "mods", type_="foreignkey")
+        _pg_drop_fk("mods", "server_id")
         op.create_foreign_key(None, "mods", "servers", ["server_id"], ["id"])
 
-        op.drop_constraint(
-            "scheduled_tasks_server_id_fkey", "scheduled_tasks", type_="foreignkey"
-        )
+        _pg_drop_fk("scheduled_tasks", "server_id")
         op.create_foreign_key(None, "scheduled_tasks", "servers", ["server_id"], ["id"])
 
-        op.drop_constraint(
-            "metric_snapshots_server_id_fkey", "metric_snapshots", type_="foreignkey"
-        )
+        _pg_drop_fk("metric_snapshots", "server_id")
         op.create_foreign_key(
             None, "metric_snapshots", "servers", ["server_id"], ["id"]
         )
 
-        op.drop_constraint(
-            "workshop_items_server_id_fkey", "workshop_items", type_="foreignkey"
-        )
+        _pg_drop_fk("workshop_items", "server_id")
         op.create_foreign_key(None, "workshop_items", "servers", ["server_id"], ["id"])
 
-        op.drop_constraint(
-            "invite_links_server_id_fkey", "invite_links", type_="foreignkey"
-        )
+        _pg_drop_fk("invite_links", "server_id")
         op.create_foreign_key(None, "invite_links", "servers", ["server_id"], ["id"])
 
-        op.drop_constraint("api_keys_user_id_fkey", "api_keys", type_="foreignkey")
+        _pg_drop_fk("api_keys", "user_id")
         op.create_foreign_key(None, "api_keys", "users", ["user_id"], ["id"])

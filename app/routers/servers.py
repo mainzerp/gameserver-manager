@@ -580,8 +580,16 @@ async def create_server(
         executable = "bedrock_server.exe" if os.name == "nt" else "bedrock_server"
         start_command = os.path.join(server_path, executable)
     else:
-        executable = ""
-        start_command = ""
+        app_info = steamcmd.get_app_info(steam_app_id) if steam_app_id else None
+        if app_info:
+            executable = app_info.get("executable", "")
+            start_args = app_info.get("start_args", "").format(
+                port=port, name=name, query_port=port + 1
+            )
+            start_command = f"./{executable} {start_args}".strip()
+        else:
+            executable = ""
+            start_command = ""
 
     server = Server(
         name=name,
@@ -796,7 +804,18 @@ async def import_server(
         executable = "bedrock_server.exe" if os.name == "nt" else "bedrock_server"
         start_command = os.path.join(resolved, executable)
     else:
-        start_command = ""
+        imported_app_id = info.get("steam_app_id") if info else None
+        app_info = (
+            steamcmd.get_app_info(imported_app_id) if imported_app_id else None
+        )
+        if app_info:
+            executable = app_info.get("executable", "")
+            start_args = app_info.get("start_args", "").format(
+                port=port, name=name.strip(), query_port=port + 1
+            )
+            start_command = f"./{executable} {start_args}".strip()
+        else:
+            start_command = ""
 
     server = Server(
         name=name.strip(),

@@ -151,6 +151,23 @@ class ServerManager:
         except OSError:
             return False
 
+    @staticmethod
+    def _kill_process_group(process: asyncio.subprocess.Process, sig: int) -> None:
+        """Send a signal to the whole process group.
+
+        ``start_new_session=True`` makes the child a process-group leader
+        (pgid == pid), so killing the group also terminates grandchildren
+        (e.g. PalServer.sh -> PalServer-Linux-Shipping). Falls back to
+        signalling the process directly if the group lookup fails.
+        """
+        try:
+            os.killpg(os.getpgid(process.pid), sig)
+        except (ProcessLookupError, PermissionError, OSError):
+            try:
+                process.send_signal(sig)
+            except (ProcessLookupError, OSError):
+                pass
+
     async def start_server(
         self, server_id: int, skip_steam_update: bool = False
     ) -> dict:
@@ -310,6 +327,7 @@ class ServerManager:
                         stderr=asyncio.subprocess.STDOUT,
                         cwd=server.path,
                         env=env,
+                        start_new_session=True,
                     )
 
                     sp = ServerProcess(server_id, process)
@@ -397,24 +415,24 @@ class ServerManager:
                 try:
                     await asyncio.wait_for(sp.process.wait(), timeout=30)
                 except asyncio.TimeoutError:
-                    sp.process.terminate()
+                    self._kill_process_group(sp.process, signal.SIGTERM)
                     try:
                         await asyncio.wait_for(sp.process.wait(), timeout=10)
                     except asyncio.TimeoutError:
-                        sp.process.kill()
+                        self._kill_process_group(sp.process, signal.SIGKILL)
                         await sp.process.wait()
             else:
-                sp.process.terminate()
+                self._kill_process_group(sp.process, signal.SIGTERM)
                 try:
                     await asyncio.wait_for(sp.process.wait(), timeout=15)
                 except asyncio.TimeoutError:
-                    sp.process.kill()
+                    self._kill_process_group(sp.process, signal.SIGKILL)
                     await sp.process.wait()
 
         except Exception as e:
             logger.error(f"Error stopping server {server_id}: {e}")
             try:
-                sp.process.kill()
+                self._kill_process_group(sp.process, signal.SIGKILL)
                 await sp.process.wait()
             except Exception:
                 pass
