@@ -307,6 +307,18 @@ class ServerManager:
                     cmd = self._build_command(server)
                     logger.info(f"Starting server {server.name}: {cmd}")
 
+                    # Pre-flight: verify the server executable exists before launching
+                    if server.executable and not os.path.isabs(server.executable):
+                        exe_path = os.path.join(server.path, server.executable)
+                        if not os.path.exists(exe_path):
+                            return {
+                                "ok": False,
+                                "error": (
+                                    f"Server executable not found: {exe_path}. "
+                                    "Please wait for the installation to complete."
+                                ),
+                            }
+
                     env = os.environ.copy()
                     if server.environment_vars:
                         import json

@@ -1,6 +1,11 @@
 # Version History
 
-## Current Version: 2.7.2
+## Current Version: 2.7.3
+
+### v2.7.3 -- Pre-flight Executable Check
+
+**Fixes:**
+- Added a pre-flight check in `server_manager.start_server` that verifies the server executable exists before launching the subprocess. This prevents a confusing `[Errno 2] No such file or directory` error when a Steam server is started while SteamCMD installation is still in progress, and returns a clear message instead.
 
 ### v2.7.2 -- PostgreSQL Enum Migration Fix
 
@@ -350,6 +355,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.7.2)
+## Recent Changes (since v2.7.3)
 
 None yet.
