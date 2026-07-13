@@ -1,6 +1,11 @@
 # Version History
 
-## Current Version: 2.7.5
+## Current Version: 2.7.6
+
+### v2.7.6 -- Header Badge Visibility Fix
+
+**Fixed:**
+- The `Steam Operation...` header badge was always visible because the `.badge` CSS rule (`display: inline-flex`) was overriding Tailwind's `.hidden` rule. Switched to the HTML `hidden` attribute for the badge so it is correctly hidden when no SteamCMD operation is active.
 
 ### v2.7.5 -- Tab Switching Fix
 
@@ -370,6 +375,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.7.5)
+## Recent Changes (since v2.7.6)
 
 None yet.
