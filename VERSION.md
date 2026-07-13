@@ -1,6 +1,14 @@
 # Version History
 
-## Current Version: 2.10.0
+## Current Version: 2.10.1
+
+### v2.10.1 -- Full-width Layout Fix
+
+**Changed:**
+- Removed the `max-w-7xl` width cap from `<main>` in `base.html` and `base_embed.html`; the UI now uses the full browser width.
+- Dashboard server grid now uses `xl:grid-cols-4` to show more server cards on very wide screens.
+- Server detail overview info cards now use an `.info-card-grid` (CSS `auto-fit`) so cards distribute evenly across the available width instead of leaving empty grid columns.
+- Tailwind CSS rebuilt to include the new `xl:grid-cols-4` utility.
 
 ### v2.10.0 -- Phase 4 Toast, Loading & Accessibility
 

@@ -487,6 +487,13 @@
             to { transform: rotate(360deg); }
         }
 
+        /* ===== Auto-fit Info Card Grid ===== */
+        .info-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+
         /* ===== Sidebar ===== */
         .sidebar-group-label {
             font-size: 11px;
@@ -750,7 +757,7 @@
         </div>
 
         <!-- Page Content -->
-        <main class="max-w-7xl mx-auto px-6 py-6 flex-1 w-full">
+        <main class="flex-1 w-full px-6 py-6">
             {% block content %}{% endblock %}
         </main>
 
