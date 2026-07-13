@@ -47,7 +47,7 @@
                 {% else %}Steam Operation...{% endif %}
             </span>
             {% else %}
-            <span id="steam-operation-header-badge" class="badge badge-info" hidden>Steam Operation...</span>
+            <span id="steam-operation-header-badge" class="badge badge-info" style="display:none;">Steam Operation...</span>
             {% endif %}
 
             {% if is_running %}
@@ -2085,10 +2085,10 @@ function buildModCard(mod) {
             return;
         }
         if (isActiveOperation(event, currentStatus)) {
-            headerBadge.hidden = false;
+            headerBadge.style.display = '';
             headerBadge.textContent = headerBadgeLabels[event.operation] || 'Steam Operation...';
         } else if (currentStatus === 'completed' || currentStatus === 'failed' || currentStatus === 'idle') {
-            headerBadge.hidden = true;
+            headerBadge.style.display = 'none';
             headerBadge.textContent = 'Steam Operation...';
         }
     }

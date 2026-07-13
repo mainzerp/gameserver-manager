@@ -1,6 +1,11 @@
 # Version History
 
-## Current Version: 2.7.6
+## Current Version: 2.7.7
+
+### v2.7.7 -- Header Badge Visibility Fix (Corrected)
+
+**Fixed:**
+- The `hidden` HTML attribute was still being overridden by `.badge { display: inline-flex }`. Now uses inline `style="display:none;"` and toggles `style.display` in JavaScript so the Steam operation badge is truly hidden when idle.
 
 ### v2.7.6 -- Header Badge Visibility Fix
 
@@ -375,6 +380,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.7.6)
+## Recent Changes (since v2.7.7)
 
 None yet.
