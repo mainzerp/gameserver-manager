@@ -1,6 +1,16 @@
 # Version History
 
-## Current Version: 2.7.3
+## Current Version: 2.7.4
+
+### v2.7.4 -- Steam Operation UI Improvements
+
+**Changed:**
+- The server detail page now shows active SteamCMD operations (install, update, validate, update & start, workshop install/update) in the existing SteamCMD panel and via a new header badge.
+- The **Start** button is disabled while any SteamCMD operation is active, so users cannot start a server while it is still installing.
+- Added `steam_operation_active` to the server detail template context and generalized the Steam operation JavaScript to handle all operation types, not only `update_start`.
+
+**Fixed:**
+- Pre-flight executable check from v2.7.3 is still in place.
 
 ### v2.7.3 -- Pre-flight Executable Check
 
@@ -355,6 +365,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.7.3)
+## Recent Changes (since v2.7.4)
 
 None yet.

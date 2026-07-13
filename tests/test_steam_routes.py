@@ -479,7 +479,8 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             response.text,
         )
         self.assertIn('data-seeded-active-update-start="false"', response.text)
-        self.assertIn("const activeUpdateStartStatuses = {", response.text)
+        self.assertIn('data-seeded-active-operation="false"', response.text)
+        self.assertIn("const activeOperationStatuses = {", response.text)
         self.assertIn("const meaningfulSteamStatuses = {", response.text)
         self.assertIn(
             "let hasSeenMeaningfulSteamActivity = "
@@ -489,9 +490,8 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("waiting_for_steam_guard: true", response.text)
         self.assertIn("function cancelStartingReloadTimer()", response.text)
-        self.assertIn("function isActiveUpdateStartOperation(event, currentStatus)", response.text)
+        self.assertIn("function isActiveOperation(event, currentStatus)", response.text)
         self.assertIn("function isMeaningfulSteamStatus(currentStatus)", response.text)
-        self.assertIn("event.operation === 'update_start'", response.text)
         self.assertIn(
             "if (event.type === 'snapshot' && currentStatus === 'idle') {",
             response.text,
@@ -529,6 +529,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             response.text,
         )
         self.assertIn('data-seeded-active-update-start="true"', response.text)
+        self.assertIn('data-seeded-active-operation="true"', response.text)
         self.assertIn(
             'id="steam-operation-message" class="text-xs" '
             'style="color: var(--clr-text-secondary);">'
@@ -539,9 +540,9 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             'id="steam-operation-progress-text" class="mt-2 text-xs" style="color: var(--clr-text-muted);">12%</p>',
             response.text,
         )
-        self.assertIn("const seededActiveUpdateStart = true;", response.text)
+        self.assertIn("const seededActiveOperation = true;", response.text)
         self.assertIn(
-            "let lastState = seededActiveUpdateStart ? seededSteamOperationSnapshot : null;",
+            "let lastState = seededActiveOperation ? seededSteamOperationSnapshot : null;",
             response.text,
         )
         self.assertIn(

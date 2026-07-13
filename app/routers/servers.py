@@ -1128,6 +1128,7 @@ async def server_detail(
     workshop_items = []
     steam_operation_snapshot = None
     steam_has_active_update_start = False
+    steam_operation_active = False
     if server.server_type == ServerType.STEAM:
         from app.models.workshop_item import WorkshopItem
 
@@ -1136,13 +1137,18 @@ async def server_detail(
         )
         workshop_items = workshop_result.scalars().all()
         steam_operation_snapshot = steamcmd.get_operation_snapshot(server_id)
+        steam_snapshot_status = steam_operation_snapshot.get("status", "idle")
         steam_has_active_update_start = steam_operation_snapshot.get(
             "operation"
-        ) == "update_start" and steam_operation_snapshot.get("status") in {
+        ) == "update_start" and steam_snapshot_status in {
             "queued",
             "running",
             "waiting_for_steam_guard",
         }
+        steam_operation_active = (
+            steam_operation_snapshot.get("operation") is not None
+            and steam_snapshot_status in {"queued", "running", "waiting_for_steam_guard"}
+        )
     from app.models.steam_account import SteamAccount
 
     steam_accounts_result = await db.execute(
@@ -1176,6 +1182,7 @@ async def server_detail(
             "steam_accounts": steam_accounts,
             "steam_operation_snapshot": steam_operation_snapshot,
             "steam_has_active_update_start": steam_has_active_update_start,
+            "steam_operation_active": steam_operation_active,
             "workshop_items": workshop_items,
         })
 
