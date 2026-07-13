@@ -12,7 +12,8 @@
 **Changed:**
 - Removed the top sticky header bar from `base.html`.
 - Added a fixed mobile-only sidebar toggle button at the top-left.
-- Main content area now starts at the top of the viewport on desktop; mobile content gets top padding to avoid the toggle button.
+- Main content area now starts at the top of the viewport on desktop; desktop top padding is tuned so the page title is vertically centered at the same height as the "GSM" sidebar brand.
+- Mobile content keeps top padding to avoid the toggle button.
 - Added "Preferences" link under the Account section in the sidebar.
 - Updated active-state logic for Settings/Preferences sidebar links.
 
