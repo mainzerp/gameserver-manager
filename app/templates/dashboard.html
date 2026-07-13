@@ -135,9 +135,9 @@
             <div>
                 <div class="flex justify-between text-sm mb-2">
                     <span style="color: var(--clr-text-secondary);">CPU</span>
-                    <span style="color: var(--clr-text-primary);" id="cpu-text">--%</span>
+                    <span id="cpu-text" class="skeleton skeleton-text" style="width: 3em; display: inline-block;"></span>
                 </div>
-                <div class="progress-bar">
+                <div class="progress-bar skeleton">
                     <div class="progress-fill" id="cpu-bar" style="width: 0%; background: var(--clr-accent);"></div>
                 </div>
             </div>
@@ -145,9 +145,9 @@
             <div>
                 <div class="flex justify-between text-sm mb-2">
                     <span style="color: var(--clr-text-secondary);">RAM</span>
-                    <span style="color: var(--clr-text-primary);" id="ram-text">--%</span>
+                    <span id="ram-text" class="skeleton skeleton-text" style="width: 4em; display: inline-block;"></span>
                 </div>
-                <div class="progress-bar">
+                <div class="progress-bar skeleton">
                     <div class="progress-fill" id="ram-bar" style="width: 0%; background: var(--clr-success);"></div>
                 </div>
             </div>
@@ -155,9 +155,9 @@
             <div>
                 <div class="flex justify-between text-sm mb-2">
                     <span style="color: var(--clr-text-secondary);">Disk</span>
-                    <span style="color: var(--clr-text-primary);" id="disk-text">--%</span>
+                    <span id="disk-text" class="skeleton skeleton-text" style="width: 4em; display: inline-block;"></span>
                 </div>
-                <div class="progress-bar">
+                <div class="progress-bar skeleton">
                     <div class="progress-fill" id="disk-bar" style="width: 0%; background: var(--clr-accent);"></div>
                 </div>
             </div>
@@ -389,12 +389,20 @@ function quickAction(serverId, action) {
     var formData = new FormData();
     formData.append('csrf_token', csrfToken);
 
+    var btn = document.querySelector('[data-click-arg="' + serverId + '|' + action + '"]');
+    if (btn && window.setButtonLoading) setButtonLoading(btn, true);
+
     fetch('/servers/' + serverId + '/' + action, {
         method: 'POST',
         body: formData
-    }).then(function() {
+    }).then(function(r) {
+        if (window.showToast) {
+            var messages = { start: 'Server start requested', stop: 'Server stop requested', restart: 'Server restart requested' };
+            showToast(messages[action] || 'Action requested', 'info');
+        }
         location.reload();
     }).catch(function() {
+        if (btn && window.setButtonLoading) setButtonLoading(btn, false);
         alert('Action failed. Please try again.');
     });
 }
@@ -432,6 +440,7 @@ function submitBulk(action) {
     });
 
     form.classList.remove('hidden');
+    if (window.showToast) showToast('Bulk ' + action + ' requested for ' + checked.length + ' server(s)', 'info');
     form.submit();
 }
 
@@ -491,15 +500,24 @@ function updateSystemStats() {
         .then(r => r.json())
         .then(d => {
             document.getElementById('cpu-text').textContent = d.cpu_percent + '%';
+            document.getElementById('cpu-text').classList.remove('skeleton', 'skeleton-text');
+            document.getElementById('cpu-text').style.width = '';
             document.getElementById('cpu-bar').style.width = d.cpu_percent + '%';
+            document.getElementById('cpu-bar').parentElement.classList.remove('skeleton');
 
             document.getElementById('ram-text').textContent = d.ram_percent + '% (' + d.ram_used_mb + '/' + d.ram_total_mb + ' MB)';
+            document.getElementById('ram-text').classList.remove('skeleton', 'skeleton-text');
+            document.getElementById('ram-text').style.width = '';
             document.getElementById('ram-bar').style.width = d.ram_percent + '%';
+            document.getElementById('ram-bar').parentElement.classList.remove('skeleton');
 
             var diskPct = d.disk_percent;
             document.getElementById('disk-text').textContent = diskPct + '% (' + d.disk_used_gb + '/' + d.disk_total_gb + ' GB)';
+            document.getElementById('disk-text').classList.remove('skeleton', 'skeleton-text');
+            document.getElementById('disk-text').style.width = '';
             document.getElementById('disk-bar').style.width = diskPct + '%';
             document.getElementById('disk-bar').style.background = diskPct > 80 ? 'var(--clr-warning)' : 'var(--clr-accent)';
+            document.getElementById('disk-bar').parentElement.classList.remove('skeleton');
         })
         .catch(() => {});
 }

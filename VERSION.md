@@ -1,6 +1,23 @@
 # Version History
 
-## Current Version: 2.9.0
+## Current Version: 2.10.0
+
+### v2.10.0 -- Phase 4 Toast, Loading & Accessibility
+
+**Added:**
+- Global toast notification system in `base.html` with success/warning/danger/info variants, auto-dismiss and close button.
+- `.skeleton`, `.skeleton-text`, `.skeleton-card` and `.btn-loading` utility classes for loading states.
+- Form-level button loading state via `data-loading` attribute on `<form>` elements.
+
+**Changed:**
+- Dashboard system resource cards now show skeleton placeholders until `/system/stats` returns live data.
+- Server detail resource bars and player list now use skeleton placeholders while loading.
+- Dashboard quick actions show a toast confirmation before reloading.
+- Server detail start/stop/restart and console/RCON submit buttons display a loading spinner while the request is in flight.
+
+**Improved:**
+- Reduced-motion support preserved; shimmer and spin animations respect `prefers-reduced-motion` via existing CSS controls.
+- Toast messages and titles are HTML-escaped to prevent XSS.
 
 ### v2.9.0 -- Phase 3 Detail Views Redesign
 

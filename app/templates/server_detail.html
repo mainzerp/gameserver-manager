@@ -51,16 +51,16 @@
             {% endif %}
 
             {% if is_running %}
-            <form action="/servers/{{ server.id }}/restart" method="post" class="inline">
+            <form action="/servers/{{ server.id }}/restart" method="post" class="inline" data-loading>
                 {{ csrf_field(request) }}
                 <button class="btn btn-secondary btn-sm">Restart</button>
             </form>
-            <form action="/servers/{{ server.id }}/stop" method="post" class="inline">
+            <form action="/servers/{{ server.id }}/stop" method="post" class="inline" data-loading>
                 {{ csrf_field(request) }}
                 <button class="btn btn-danger btn-sm">Stop</button>
             </form>
             {% else %}
-            <form action="/servers/{{ server.id }}/start" method="post" class="inline">
+            <form action="/servers/{{ server.id }}/start" method="post" class="inline" data-loading>
                 {{ csrf_field(request) }}
                 <button class="btn btn-primary btn-sm" {% if steam_operation_active %}disabled{% endif %}>Start</button>
             </form>
@@ -194,7 +194,7 @@
         </div>
         <!-- Tab Completion Popup -->
         <div id="tab-complete-popup" class="hidden absolute z-50 rounded-lg shadow-lg p-2 text-xs max-h-48 overflow-y-auto" style="background:var(--clr-panel);border:1px solid var(--clr-border);"></div>
-        <form id="console-form" class="console-input-area">
+        <form id="console-form" class="console-input-area" data-loading>
             <span class="prompt">&gt;</span>
             <input type="text" id="console-input" placeholder="Enter command..."
                 {% if not is_running %}disabled{% endif %}>
@@ -207,7 +207,7 @@
     <div class="console-container mb-6">
         <div class="card-header">RCON Console</div>
         <div class="console-output p-4" id="rcon-output" style="min-height:100px;max-height:200px;overflow-y:auto;color:var(--clr-warning);"></div>
-        <form id="rcon-form" class="console-input-area">
+        <form id="rcon-form" class="console-input-area" data-loading>
             <span class="prompt" style="color:var(--clr-warning);">RCON&gt;</span>
             <input type="text" id="rcon-input" placeholder="Enter RCON command...">
             <button type="submit" style="color:var(--clr-warning);">Send</button>
@@ -283,18 +283,18 @@
                     <div>
                         <div class="flex justify-between text-sm mb-2">
                             <span style="color:var(--clr-text-secondary);">Server CPU</span>
-                            <span id="srv-cpu-text" style="color:var(--clr-text-primary);">--</span>
+                            <span id="srv-cpu-text" class="skeleton skeleton-text" style="width: 3em; display: inline-block;"></span>
                         </div>
-                        <div class="progress-bar">
+                        <div class="progress-bar skeleton">
                             <div class="progress-fill" id="srv-cpu-bar" style="width:0%;background:var(--clr-accent);"></div>
                         </div>
                     </div>
                     <div>
                         <div class="flex justify-between text-sm mb-2">
                             <span style="color:var(--clr-text-secondary);">Server RAM</span>
-                            <span id="srv-ram-text" style="color:var(--clr-text-primary);">--</span>
+                            <span id="srv-ram-text" class="skeleton skeleton-text" style="width: 4em; display: inline-block;"></span>
                         </div>
-                        <div class="progress-bar">
+                        <div class="progress-bar skeleton">
                             <div class="progress-fill" id="srv-ram-bar" style="width:0%;background:var(--clr-success);"></div>
                         </div>
                     </div>
@@ -333,7 +333,7 @@
             </div>
         </div>
         <div class="card-body">
-            <div id="player-list" class="text-sm" style="color:var(--clr-text-secondary);">Loading...</div>
+            <div id="player-list" class="text-sm skeleton skeleton-card" style="color:var(--clr-text-secondary);"></div>
         </div>
     </div>
     {% endif %}
@@ -2587,12 +2587,20 @@ function createConsoleLine(text) {
                     const ramBar = document.getElementById('srv-ram-bar');
                     if (cpuEl) {
                         cpuEl.textContent = stats.process.cpu_percent + '%';
+                        cpuEl.classList.remove('skeleton', 'skeleton-text');
+                        cpuEl.style.width = '';
+                        cpuEl.style.color = 'var(--clr-text-primary)';
                         cpuBar.style.width = Math.min(stats.process.cpu_percent, 100) + '%';
+                        cpuBar.parentElement.classList.remove('skeleton');
                     }
                     if (ramEl) {
                         ramEl.textContent = stats.process.ram_mb + ' MB';
+                        ramEl.classList.remove('skeleton', 'skeleton-text');
+                        ramEl.style.width = '';
+                        ramEl.style.color = 'var(--clr-text-primary)';
                         const ramPct = stats.system.ram_total_mb > 0 ? (stats.process.ram_mb / stats.system.ram_total_mb * 100) : 0;
                         ramBar.style.width = Math.min(ramPct, 100) + '%';
+                        ramBar.parentElement.classList.remove('skeleton');
                     }
                 } else {
                     if (runningEl) runningEl.classList.add('hidden');
@@ -2935,6 +2943,7 @@ function refreshPlayers() {
     var listEl = document.getElementById('player-list');
     var countEl = document.getElementById('player-count');
     if (!listEl) return;
+    listEl.classList.remove('skeleton', 'skeleton-card');
     listEl.textContent = 'Loading...';
     fetch('/servers/{{ server.id }}/players')
         .then(function(r) { return r.json(); })
@@ -2956,6 +2965,7 @@ function refreshPlayers() {
             listEl.innerHTML = html;
         })
         .catch(function() {
+            listEl.classList.remove('skeleton', 'skeleton-card');
             listEl.textContent = 'Failed to load player list';
         });
 }
