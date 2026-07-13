@@ -370,6 +370,14 @@
                 <label class="text-sm font-medium" for="steam_update_on_start">Update on Start</label>
                 <p class="text-xs" style="color: var(--clr-text-muted);">Run SteamCMD update before every server start</p>
             </div>
+
+            <div class="mt-4" id="steam_query_port_section">
+                <label class="block text-sm font-medium mb-2" for="query_port">Query Port</label>
+                <input type="number" id="query_port" name="query_port" value="{{ form_values.get('query_port', suggested_query_port|default(0)) }}"
+                    min="1024" max="65535"
+                    class="input-field">
+                <p class="text-xs mt-1" style="color: var(--clr-text-muted);">Used by Steam server browser and A2S queries. Defaults to game port + 1.</p>
+            </div>
         </div>
 
         <!-- Port -->
@@ -445,6 +453,11 @@ function onSteamAppChange() {
         document.getElementById('port').value = port;
     } else {
         document.getElementById('port').value = '27015';
+    }
+    var gamePort = parseInt(document.getElementById('port').value, 10);
+    var queryPortInput = document.getElementById('query_port');
+    if (queryPortInput && !isNaN(gamePort)) {
+        queryPortInput.value = gamePort + 1;
     }
 }
 
@@ -578,6 +591,10 @@ async function fetchSuggestedPorts() {
                 const rconPortInput = document.getElementById('rcon_port');
                 if (rconPortInput && data.data.rcon_port) {
                     rconPortInput.value = data.data.rcon_port;
+                }
+                const queryPortInput = document.getElementById('query_port');
+                if (queryPortInput && data.data.query_port) {
+                    queryPortInput.value = data.data.query_port;
                 }
             }
         }

@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 os.environ.setdefault("GSM_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 
-from app.models.steam_account import SteamAccount, encrypt_password
 from app.models.server import ServerType
+from app.models.steam_account import SteamAccount, encrypt_password
 from app.services.steam_workshop import steam_workshop_service
 from app.services.steamcmd import (
     build_runtime_command,
@@ -59,15 +59,11 @@ class SteamCmdServiceTests(unittest.IsolatedAsyncioTestCase):
             steam_account_id=1,
         )
 
-        kwargs, error = await steamcmd.get_server_install_kwargs(
-            db, server, interactive=False
-        )
+        kwargs, error = await steamcmd.get_server_install_kwargs(db, server, interactive=False)
         self.assertFalse(kwargs["login_anonymous"])
         self.assertIn("Steam Guard", error)
 
-        kwargs, error = await steamcmd.get_server_install_kwargs(
-            db, server, interactive=True
-        )
+        kwargs, error = await steamcmd.get_server_install_kwargs(db, server, interactive=True)
         self.assertIsNone(error)
         self.assertEqual(kwargs["username"], "steam-user")
         self.assertEqual(kwargs["password"], "secret")
@@ -115,9 +111,7 @@ class SteamCmdServiceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(snapshot["status"], "waiting_for_steam_guard")
             self.assertEqual(snapshot["operation"], "install")
 
-            submit_result = await steamcmd.submit_steam_guard_code(
-                99, snapshot["operation_id"], "123456"
-            )
+            submit_result = await steamcmd.submit_steam_guard_code(99, snapshot["operation_id"], "123456")
             self.assertTrue(submit_result["ok"])
 
             result = await task
@@ -156,9 +150,7 @@ class SteamCmdServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(steamcmd.get_operation_snapshot(55)["status"], "running")
 
     async def test_queue_operation_creates_reconnectable_snapshot(self):
-        operation_id = await steamcmd.queue_operation(
-            12, "validate", "Queued validation."
-        )
+        operation_id = await steamcmd.queue_operation(12, "validate", "Queued validation.")
 
         snapshot = steamcmd.get_operation_snapshot(12)
         self.assertEqual(snapshot["operation_id"], operation_id)
@@ -179,6 +171,18 @@ class SteamCmdServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(command)
         self.assertIn("srcds_run", command)
         self.assertNotIn("sv_setsteamaccount", command)
+
+    async def test_generate_start_command_uses_custom_query_port(self):
+        command = generate_start_command("2394010", 8211, "Custom Query", query_port=27020)
+
+        self.assertIsNotNone(command)
+        self.assertIn("27020", command)
+
+    async def test_generate_start_command_defaults_query_port_to_game_plus_one(self):
+        command = generate_start_command("2394010", 8211, "Default Query")
+
+        self.assertIsNotNone(command)
+        self.assertIn("8212", command)
 
     async def test_build_runtime_command_injects_gmod_gslt_only_for_app_4020(self):
         gmod_server = SimpleNamespace(
@@ -238,9 +242,7 @@ class WorkshopMetadataServiceTests(unittest.IsolatedAsyncioTestCase):
             "app.services.steam_workshop.httpx.AsyncClient",
             return_value=ClientContext(),
         ):
-            metadata = await steam_workshop_service.fetch_metadata(
-                "123", steam_api_key="api-key"
-            )
+            metadata = await steam_workshop_service.fetch_metadata("123", steam_api_key="api-key")
 
         self.assertEqual(metadata["name"], "Sample Mod")
         self.assertEqual(metadata["description"], "Hello world")

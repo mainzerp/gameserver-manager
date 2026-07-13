@@ -371,6 +371,10 @@
                     <span style="color:var(--clr-text-primary);" class="font-mono">{{ server.steam_build_id or 'Unknown' }}</span>
                 </div>
                 <div class="flex justify-between">
+                    <span style="color:var(--clr-text-secondary);">Query Port</span>
+                    <span style="color:var(--clr-text-primary);" class="font-mono">{{ server.query_port or (server.port + 1) }}</span>
+                </div>
+                <div class="flex justify-between">
                     <span style="color:var(--clr-text-secondary);">Login</span>
                     <span style="color:var(--clr-text-primary);">{{ 'Anonymous' if server.steam_login_anonymous else 'Authenticated' }}</span>
                 </div>
@@ -424,6 +428,13 @@
                                 <option value="{{ account.id }}" {% if server.steam_account_id == account.id %}selected{% endif %}>{{ account.display_name }} ({{ account.username }})</option>
                                 {% endfor %}
                             </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs mb-1" style="color:var(--clr-text-secondary);" for="query_port_edit">Query Port</label>
+                            <input id="query_port_edit" name="query_port" type="number" min="1024" max="65535" value="{{ server.query_port or (server.port + 1) }}" class="input-field">
+                            <p class="text-xs mt-1" style="color:var(--clr-text-muted);">Steam server browser / A2S query port.</p>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">

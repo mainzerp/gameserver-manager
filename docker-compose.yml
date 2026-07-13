@@ -8,8 +8,18 @@ services:
       # - "2222:2222"               # SFTP access (enable when GSM_SFTP_ENABLED=true)
       - "25565-25575:25565-25575"   # Minecraft Java
       - "19132:19132/udp"            # Minecraft Bedrock
-      - "27015-27020:27015-27020"    # Steam game servers
+      # Steam game server ports. Adjust per server; multiple servers on the same
+      # game port require unique host ports below.
+      - "27015-27020:27015-27020"    # Source engine (CS2, TF2, GMod, L4D2)
       - "27015-27020:27015-27020/udp"
+      - "2456-2458:2456-2458/udp"    # Valheim
+      - "7777-7780:7777-7780"        # ARK / Satisfactory game
+      - "7777-7780:7777-7780/udp"
+      - "8211-8212:8211-8212/udp"    # Palworld
+      - "15636-15637:15636-15637/udp" # Enshrouded
+      - "28015-28017:28015-28017/udp" # Rust
+      - "26900-26903:26900-26903"     # 7 Days to Die
+      - "26900-26903:26900-26903/udp"
     environment:
       - TZ=Europe/Berlin
       - GSM_DEBUG=false

@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 class PortManager:
     DEFAULT_RANGES = {
-        "minecraft_java": {"game": 25565, "rcon": 25575},
-        "minecraft_bedrock": {"game": 19132, "rcon": 0},
-        "steam": {"game": 27015, "rcon": 27015},
+        "minecraft_java": {"game": 25565, "rcon": 25575, "query": 0},
+        "minecraft_bedrock": {"game": 19132, "rcon": 0, "query": 19133},
+        "steam": {"game": 27015, "rcon": 27015, "query": 27016},
     }
 
     async def get_used_ports(
@@ -31,10 +31,12 @@ class PortManager:
                 ports.add(s.port)
             if s.rcon_port:
                 ports.add(s.rcon_port)
+            if s.query_port:
+                ports.add(s.query_port)
         return ports
 
     async def suggest_ports(self, db: AsyncSession, server_type: str) -> dict[str, int]:
-        defaults = self.DEFAULT_RANGES.get(server_type, {"game": 25565, "rcon": 25575})
+        defaults = self.DEFAULT_RANGES.get(server_type, {"game": 25565, "rcon": 25575, "query": 0})
         used = await self.get_used_ports(db)
 
         game_port = defaults["game"]
@@ -50,13 +52,28 @@ class PortManager:
                 if rcon_port > 65535:
                     break
 
-        return {"game_port": game_port, "rcon_port": rcon_port}
+        query_port = defaults["query"]
+        if query_port > 0:
+            while query_port in used or query_port == game_port or query_port == rcon_port:
+                query_port += 1
+                if query_port > 65535:
+                    break
+        elif server_type == "steam":
+            # Default Steam query port is game port + 1 if no specific default is defined.
+            query_port = game_port + 1
+            while query_port in used or query_port == rcon_port:
+                query_port += 1
+                if query_port > 65535:
+                    break
+
+        return {"game_port": game_port, "rcon_port": rcon_port, "query_port": query_port}
 
     async def check_conflicts(
         self,
         db: AsyncSession,
         game_port: int,
         rcon_port: int | None,
+        query_port: int | None = None,
         exclude_server_id: int | None = None,
     ) -> list[str]:
         used = await self.get_used_ports(db, exclude_server_id)
@@ -71,6 +88,14 @@ class PortManager:
             )
         if rcon_port and rcon_port == game_port:
             conflicts.append("Game port and RCON port cannot be the same.")
+        if query_port and query_port in used:
+            conflicts.append(
+                f"Query port {query_port} is already in use by another managed server."
+            )
+        if query_port and query_port == game_port:
+            conflicts.append("Game port and query port cannot be the same.")
+        if query_port and rcon_port and query_port == rcon_port:
+            conflicts.append("RCON port and query port cannot be the same.")
         return conflicts
 
     def check_os_port(self, port: int) -> bool:

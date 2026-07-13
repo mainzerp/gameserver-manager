@@ -54,6 +54,45 @@ def decrypt_password(encrypted: str) -> str:
     raise ValueError("Invalid encryption key or corrupted data")
 
 
+def encrypt_totp_secret(plain: str) -> str:
+    """Encrypt a Steam Guard TOTP shared secret (base32)."""
+    from app.config import settings
+
+    secret = settings.encryption_key or settings.secret_key
+    key = _derive_key_v2(secret)
+    return Fernet(key).encrypt(plain.encode()).decode()
+
+
+def decrypt_totp_secret(encrypted: str) -> str:
+    """Decrypt a Steam Guard TOTP shared secret."""
+    for key in _get_fernet_keys():
+        try:
+            return Fernet(key).decrypt(encrypted.encode()).decode()
+        except InvalidToken:
+            continue
+    logger.warning("Failed to decrypt Steam Guard TOTP secret (all keys exhausted)")
+    raise ValueError("Invalid encryption key or corrupted data")
+
+
+def generate_steam_totp_code(shared_secret: str) -> str | None:
+    """Generate a Steam Guard TOTP code from a base32 shared secret.
+
+    Steam's TOTP uses a 30-second window and 5-digit codes. The shared secret
+    must be provided as a base32-encoded string.
+    """
+    if not shared_secret:
+        return None
+    try:
+        import pyotp
+
+        return pyotp.TOTP(
+            shared_secret.replace(" ", ""), digits=5, interval=30
+        ).now()
+    except Exception as exc:
+        logger.warning("Failed to generate Steam Guard TOTP code: %s", exc)
+        return None
+
+
 class SteamAccount(Base):
     __tablename__ = "steam_accounts"
 
@@ -64,6 +103,7 @@ class SteamAccount(Base):
     steam_guard_type: Mapped[str] = mapped_column(
         String(20), default="none", server_default="none"
     )
+    steam_guard_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_anonymous: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0"
     )

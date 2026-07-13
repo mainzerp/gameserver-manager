@@ -486,11 +486,19 @@
                     </div>
                     <div>
                         <label class="block text-xs mb-1" style="color: var(--clr-text-muted);" for="sa_guard_type">Steam Guard Type</label>
-                        <select id="sa_guard_type" name="steam_guard_type" class="input-field">
+                        <select id="sa_guard_type" name="steam_guard_type" class="input-field" onchange="toggleTotpSecret()">
                             <option value="none">none</option>
                             <option value="email">email</option>
                             <option value="mobile">mobile</option>
+                            <option value="totp">TOTP (auto-generated)</option>
                         </select>
+                    </div>
+                    <div id="sa_totp_secret_wrapper" class="hidden">
+                        <label class="block text-xs mb-1" style="color: var(--clr-text-muted);" for="sa_totp_secret">TOTP Shared Secret (base32)</label>
+                        <input type="password" id="sa_totp_secret" name="steam_guard_secret" class="input-field" placeholder="Base32 shared secret from Steam Guard" autocomplete="off">
+                        <p class="text-xs mt-1" style="color: var(--clr-text-muted);">
+                            Stored encrypted. GSM will generate current 5-digit codes automatically.
+                        </p>
                     </div>
                     <button type="submit" class="btn btn-primary btn-sm">Add Account</button>
                 </form>
@@ -507,6 +515,18 @@ function switchTab(name) {
     document.getElementById('panel-' + name).classList.remove('hidden');
     document.getElementById('tab-' + name).classList.add('tab-btn-active');
 }
+
+function toggleTotpSecret() {
+    const select = document.getElementById('sa_guard_type');
+    const wrapper = document.getElementById('sa_totp_secret_wrapper');
+    if (select.value === 'totp') {
+        wrapper.classList.remove('hidden');
+    } else {
+        wrapper.classList.add('hidden');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', toggleTotpSecret);
 
 async function testSmtp(btn) {
     const result = document.getElementById('smtp-test-result');

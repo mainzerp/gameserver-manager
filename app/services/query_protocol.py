@@ -118,10 +118,114 @@ class MinecraftQueryProtocol:
 
 
 class SteamQueryProtocol:
-    """Steam A2S_PLAYER query protocol."""
+    """Steam A2S_INFO and A2S_PLAYER query protocols."""
 
+    A2S_INFO = b"\xff\xff\xff\xff\x54Source Engine Query\x00"
+    A2S_INFO_RESPONSE = 0x49
     A2S_PLAYER = b"\xff\xff\xff\xff\x55"
     A2S_PLAYER_RESPONSE = 0x44
+
+    async def query_info(
+        self, host: str, port: int, timeout: float = 5.0
+    ) -> dict | None:
+        """Query Steam server for status via A2S_INFO.
+
+        Returns dict with name, map, folder, game, app_id, players, max_players,
+        bots, visibility, vac, or None on failure.
+        """
+        loop = asyncio.get_event_loop()
+        transport = None
+        try:
+            transport, protocol = await asyncio.wait_for(
+                loop.create_datagram_endpoint(
+                    lambda: _SteamProtocol(),
+                    remote_addr=(host, port),
+                ),
+                timeout=timeout,
+            )
+
+            # Step 1: Send challenge request
+            transport.sendto(self.A2S_INFO)
+            data = await asyncio.wait_for(protocol.response_future, timeout=timeout)
+
+            if len(data) < 5 or data[4] != 0x41:
+                logger.debug(
+                    "A2S_INFO unexpected challenge response from %s:%s", host, port
+                )
+                return None
+
+            challenge = data[5:9]
+
+            # Step 2: Send actual request with challenge
+            protocol.reset()
+            transport.sendto(self.A2S_INFO + challenge)
+            data = await asyncio.wait_for(protocol.response_future, timeout=timeout)
+
+            if len(data) < 6 or data[4] != self.A2S_INFO_RESPONSE:
+                logger.debug("A2S_INFO unexpected response from %s:%s", host, port)
+                return None
+
+            return self._parse_info_response(data[5:])
+        except Exception as e:
+            logger.debug("A2S_INFO query to %s:%s failed: %s", host, port, e)
+            return None
+        finally:
+            if transport:
+                transport.close()
+
+    def _parse_info_response(self, data: bytes) -> dict | None:
+        offset = 0
+
+        def read_byte() -> int:
+            nonlocal offset
+            if offset >= len(data):
+                return 0
+            value = data[offset]
+            offset += 1
+            return value
+
+        def read_string() -> str:
+            nonlocal offset
+            end = data.find(b"\x00", offset)
+            if end == -1:
+                end = len(data)
+            value = data[offset:end].decode("utf-8", errors="replace")
+            offset = end + 1
+            return value
+
+        try:
+            protocol = read_byte()
+            name = read_string()
+            map_name = read_string()
+            folder = read_string()
+            game = read_string()
+            app_id = struct.unpack_from("<h", data, offset)[0]
+            offset += 2
+            players = read_byte()
+            max_players = read_byte()
+            bots = read_byte()
+            server_type = chr(read_byte())
+            environment = chr(read_byte())
+            visibility = read_byte()
+            vac = read_byte()
+            return {
+                "protocol": protocol,
+                "name": name,
+                "map": map_name,
+                "folder": folder,
+                "game": game,
+                "app_id": app_id,
+                "players": players,
+                "max_players": max_players,
+                "bots": bots,
+                "server_type": server_type,
+                "environment": environment,
+                "visibility": visibility,
+                "vac": vac,
+            }
+        except Exception as exc:
+            logger.debug("Failed to parse A2S_INFO response: %s", exc)
+            return None
 
     async def query_players(
         self, host: str, port: int, timeout: float = 5.0

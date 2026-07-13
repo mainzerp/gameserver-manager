@@ -223,17 +223,27 @@ async def add_steam_account(
     username = (form.get("username") or "").strip()
     password = (form.get("password") or "").strip()
     steam_guard_type = (form.get("steam_guard_type") or "none").strip()
+    steam_guard_secret = (form.get("steam_guard_secret") or "").strip()
 
     if not display_name or not username or not password:
         return RedirectResponse(url="/settings/", status_code=303)
 
-    from app.models.steam_account import SteamAccount, encrypt_password
+    from app.models.steam_account import (
+        SteamAccount,
+        encrypt_password,
+        encrypt_totp_secret,
+    )
+
+    secret_encrypted = None
+    if steam_guard_type == "totp" and steam_guard_secret:
+        secret_encrypted = encrypt_totp_secret(steam_guard_secret)
 
     account = SteamAccount(
         display_name=display_name,
         username=username,
         password_encrypted=encrypt_password(password),
         steam_guard_type=steam_guard_type,
+        steam_guard_secret_encrypted=secret_encrypted,
     )
     db.add(account)
     await db.commit()

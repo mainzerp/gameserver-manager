@@ -60,6 +60,7 @@ class Server(Base):
     steam_last_update: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    query_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     mc_version: Mapped[str] = mapped_column(String(20), nullable=True)
     loader: Mapped[str] = mapped_column(
         String(50), nullable=True

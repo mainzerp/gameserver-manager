@@ -135,10 +135,11 @@ async def _run_create_steam_install(
             app_info = steamcmd.get_app_info(server.steam_app_id)
             if app_info:
                 server.executable = app_info.get("executable", server.executable)
+                query_port = server.query_port or (server.port + 1)
                 start_args = app_info.get("start_args", "").format(
                     port=server.port,
                     name=server.name,
-                    query_port=server.port + 1,
+                    query_port=query_port,
                 )
                 server.start_command = (
                     f"./{app_info['executable']} {start_args}".strip()
@@ -407,6 +408,7 @@ async def create_server_form(request: Request, db: AsyncSession = Depends(get_db
             "form_values": {},
             "suggested_game_port": suggested["game_port"],
             "suggested_rcon_port": suggested["rcon_port"],
+            "suggested_query_port": suggested["query_port"],
             "presets": get_templates(),
             "nodes": nodes,
             "steam_accounts": steam_accounts,
@@ -436,6 +438,7 @@ async def create_server(
     rcon_port: int = Form(25575),
     rcon_password: str = Form(""),
     node_id: int = Form(None),
+    query_port: int = Form(0),
     # Server Properties (Minecraft)
     motd: str = Form("A Minecraft Server"),
     level_seed: str = Form(""),
@@ -472,6 +475,7 @@ async def create_server(
         "rcon_enabled": rcon_enabled,
         "rcon_port": rcon_port,
         "rcon_password": rcon_password,
+        "query_port": query_port,
         "motd": motd,
         "level_seed": level_seed,
         "white_list": white_list,
@@ -514,8 +518,9 @@ async def create_server(
         )
 
     if not errors:
+        effective_query_port = (query_port or (port + 1)) if server_type == ServerType.STEAM.value else None
         port_conflicts = await port_manager.check_conflicts(
-            db, port, rcon_port if rcon_enabled else None
+            db, port, rcon_port if rcon_enabled else None, effective_query_port
         )
         errors.extend(port_conflicts)
 
@@ -555,6 +560,7 @@ async def create_server(
                 "form_values": form_values,
                 "suggested_game_port": suggested["game_port"],
                 "suggested_rcon_port": suggested["rcon_port"],
+                "suggested_query_port": suggested["query_port"],
                 "presets": get_templates(),
                 "nodes": nodes,
                 "steam_accounts": steam_accounts_err,
@@ -565,6 +571,7 @@ async def create_server(
     os.makedirs(server_path, exist_ok=True)
 
     st = ServerType(server_type)
+    effective_query_port = query_port if query_port else (port + 1)
 
     # Auto-detect the correct Java version for this MC version
     if st == ServerType.MINECRAFT_JAVA and mc_version:
@@ -584,7 +591,7 @@ async def create_server(
         if app_info:
             executable = app_info.get("executable", "")
             start_args = app_info.get("start_args", "").format(
-                port=port, name=name, query_port=port + 1
+                port=port, name=name, query_port=effective_query_port
             )
             start_command = f"./{executable} {start_args}".strip()
         else:
@@ -602,6 +609,7 @@ async def create_server(
         min_memory=min_memory,
         max_memory=max_memory,
         port=port,
+        query_port=effective_query_port if st == ServerType.STEAM else None,
         auto_start=auto_start,
         mc_version=mc_version or None,
         loader=loader or None,
@@ -828,6 +836,7 @@ async def import_server(
         min_memory=min_memory,
         max_memory=max_memory,
         port=port,
+        query_port=port + 1 if st == ServerType.STEAM else None,
         loader=loader or None,
     )
     db.add(server)
@@ -1507,6 +1516,7 @@ async def update_steam_settings(
     steam_gslt: str = Form(""),
     clear_steam_gslt: bool = Form(False),
     steam_update_on_start: bool = Form(False),
+    query_port: int = Form(0),
     db: AsyncSession = Depends(get_db),
 ):
     await require_role(request, "admin")
@@ -1530,12 +1540,32 @@ async def update_steam_settings(
     elif steam_gslt.strip():
         server.steam_gslt = steam_gslt.strip()
     server.steam_update_on_start = steam_update_on_start
+    if query_port:
+        new_query_port = query_port
+    elif server.query_port is None:
+        new_query_port = server.port + 1
+    else:
+        new_query_port = server.query_port
+
+    if new_query_port != server.query_port:
+        conflicts = await port_manager.check_conflicts(
+            db,
+            server.port,
+            server.rcon_port,
+            new_query_port,
+            exclude_server_id=server.id,
+        )
+        if conflicts:
+            raise HTTPException(status_code=400, detail=" ".join(conflicts))
+    server.query_port = new_query_port
 
     app_info = steamcmd.get_app_info(steam_app_id) if steam_app_id else None
     if app_info:
         server.executable = app_info.get("executable", server.executable)
         server.start_command = (
-            generate_start_command(steam_app_id, server.port, server.name)
+            generate_start_command(
+                steam_app_id, server.port, server.name, server.query_port
+            )
             or server.start_command
         )
 
@@ -1928,6 +1958,7 @@ async def clone_server(
         min_memory=source.min_memory,
         max_memory=source.max_memory,
         port=suggested["game_port"],
+        query_port=suggested["query_port"] if source.server_type == ServerType.STEAM else source.query_port,
         auto_start=False,
         mc_version=source.mc_version,
         loader=source.loader,

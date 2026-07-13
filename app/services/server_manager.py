@@ -488,6 +488,17 @@ class ServerManager:
 
                 await docker_manager.send_command(server.container_id, command)
                 return True
+            if (
+                server
+                and server.server_type == ServerType.STEAM
+                and server.rcon_enabled
+                and server.rcon_port
+                and server.rcon_password
+            ):
+                from app.services.steam_rcon import steam_rcon_service
+
+                result = await steam_rcon_service.send_command(server, command)
+                return result.get("ok", False)
         sp = self._processes.get(server_id)
         if not sp:
             return False

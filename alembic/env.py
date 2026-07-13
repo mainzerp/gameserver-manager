@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import Base
 
 import app.models.server
+import app.models.steam_account
 import app.models.mod
 import app.models.user
 import app.models.backup

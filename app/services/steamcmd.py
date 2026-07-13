@@ -100,7 +100,7 @@ STEAM_APPS = {
     "enshrouded": {
         "app_id": "2278520",
         "name": "Enshrouded",
-        "executable": "enshrouded_server.exe",
+        "executable": "enshrouded_server",
         "default_port": 15636,
         "start_args": "",
         "login_required": False,
@@ -185,7 +185,7 @@ def _validate_server_name(name: str) -> None:
 
 
 def generate_start_command(
-    app_id: str, port: int, server_name: str = "GameServer"
+    app_id: str, port: int, server_name: str = "GameServer", query_port: int | None = None
 ) -> str | None:
     """Generate a start command for a known Steam game."""
     _validate_server_name(server_name)
@@ -197,10 +197,11 @@ def generate_start_command(
     if not app_info:
         return None
     executable = app_info.get("executable", "")
+    resolved_query_port = query_port if query_port is not None else port + 1
     start_args = app_info.get("start_args", "").format(
         port=port,
         name=server_name,
-        query_port=port + 1,
+        query_port=resolved_query_port,
     )
     return f"./{executable} {start_args}".strip()
 
@@ -878,16 +879,36 @@ class SteamCMD:
     async def get_account_credentials(self, db, account_id: int | None) -> dict:
         if not account_id:
             return {}
-        from app.models.steam_account import SteamAccount, decrypt_password
+        from app.models.steam_account import (
+            SteamAccount,
+            decrypt_password,
+            decrypt_totp_secret,
+            generate_steam_totp_code,
+        )
 
         account = await db.get(SteamAccount, account_id)
         if not account:
             return {}
-        return {
+        creds = {
             "username": account.username,
             "password": decrypt_password(account.password_encrypted),
             "steam_guard_type": account.steam_guard_type,
         }
+        secret = account.steam_guard_secret_encrypted
+        if secret:
+            try:
+                creds["steam_guard_secret"] = decrypt_totp_secret(secret)
+            except ValueError:
+                logger.warning(
+                    "Failed to decrypt Steam Guard TOTP secret for account %s",
+                    account.username,
+                )
+        totp_secret = creds.get("steam_guard_secret")
+        if totp_secret:
+            code = generate_steam_totp_code(totp_secret)
+            if code:
+                creds["steam_guard_code"] = code
+        return creds
 
     async def get_server_install_kwargs(
         self, db, server, interactive: bool = False
@@ -911,7 +932,8 @@ class SteamCMD:
             return kwargs, "Assigned Steam account could not be loaded."
 
         guard_type = (creds.get("steam_guard_type") or "none").strip().lower()
-        if guard_type != "none" and not interactive:
+        steam_guard_code = creds.get("steam_guard_code")
+        if guard_type != "none" and not interactive and not steam_guard_code:
             return (
                 kwargs,
                 f"Steam account '{creds.get('username')}' requires Steam Guard "
@@ -925,6 +947,8 @@ class SteamCMD:
                 "password": creds.get("password"),
             }
         )
+        if steam_guard_code:
+            kwargs["steam_guard_code"] = steam_guard_code
         return kwargs, None
 
     async def install_workshop_item(

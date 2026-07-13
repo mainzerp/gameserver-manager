@@ -7,13 +7,13 @@ from unittest.mock import AsyncMock, patch
 
 os.environ.setdefault("GSM_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 
-import app.models  # noqa: F401
 import httpx
 from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from starlette.middleware.sessions import SessionMiddleware
 
+import app.models  # noqa: F401
 from app.database import Base
 from app.models.server import Server, ServerStatus, ServerType
 from app.models.workshop_item import WorkshopItem
@@ -47,9 +47,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             return SimpleNamespace(id=1, role="admin")
 
         self.app.dependency_overrides[servers.get_db] = override_get_db
-        self.app.dependency_overrides[servers.get_current_user_dep] = (
-            override_current_user
-        )
+        self.app.dependency_overrides[servers.get_current_user_dep] = override_current_user
 
         self.transport = httpx.ASGITransport(app=self.app)
         self.client = httpx.AsyncClient(
@@ -71,9 +69,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             self.spawned.append(coro)
             coro.close()
 
-        self.spawn_patch = patch.object(
-            servers, "_spawn_background_task", side_effect=capture_task
-        )
+        self.spawn_patch = patch.object(servers, "_spawn_background_task", side_effect=capture_task)
         self.role_patch = patch.object(
             servers,
             "require_role",
@@ -84,9 +80,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             "require_server_access",
             AsyncMock(return_value=SimpleNamespace(id=1, role="admin")),
         )
-        self.log_patch = patch.object(
-            servers.audit_service, "log", AsyncMock(return_value=None)
-        )
+        self.log_patch = patch.object(servers.audit_service, "log", AsyncMock(return_value=None))
         self.create_task_patch = patch.object(
             servers.audit_service, "create_task", side_effect=lambda coro: coro.close()
         )
@@ -111,9 +105,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         self.temp_dir.cleanup()
 
     async def _create_server(self, **overrides) -> Server:
-        server_path = Path(self.temp_dir.name) / overrides.get(
-            "path_name", f"server-{len(self.spawned)}"
-        )
+        server_path = Path(self.temp_dir.name) / overrides.get("path_name", f"server-{len(self.spawned)}")
         server_path.mkdir(parents=True, exist_ok=True)
         values = {
             "name": overrides.get("name", "Steam Test"),
@@ -126,6 +118,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             "min_memory": 1024,
             "max_memory": 2048,
             "port": overrides.get("port", 27015),
+            "query_port": overrides.get("query_port"),
             "steam_app_id": overrides.get("steam_app_id", "730"),
             "steam_branch": overrides.get("steam_branch", "public"),
             "steam_login_anonymous": overrides.get("steam_login_anonymous", True),
@@ -186,14 +179,113 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot["status"], "queued")
         self.assertEqual(snapshot["operation"], "install")
 
+    async def test_create_steam_server_persists_query_port(self):
+        response = await self.client.post(
+            "/servers/create",
+            data={
+                "name": "Steam With Query Port",
+                "server_type": "steam",
+                "port": "8211",
+                "query_port": "27025",
+                "min_memory": "1024",
+                "max_memory": "2048",
+                "steam_app_id": "2394010",
+                "steam_login_anonymous": "true",
+            },
+        )
+
+        self.assertEqual(response.status_code, 303)
+        async with self.session_maker() as session:
+            result = await session.execute(select(Server))
+            created = result.scalars().all()
+            self.assertEqual(len(created), 1)
+            self.assertEqual(created[0].query_port, 27025)
+            self.assertIn("27025", created[0].start_command)
+
+    async def test_update_steam_settings_persists_query_port(self):
+        server = await self._create_server(
+            name="Steam Query Update", steam_app_id="2394010", query_port=8212
+        )
+
+        response = await self.client.post(
+            f"/servers/{server.id}/steam/settings",
+            data={
+                "steam_app_id": "2394010",
+                "steam_branch": "public",
+                "steam_login_anonymous": "true",
+                "steam_account_id": "",
+                "steam_gslt": "",
+                "clear_steam_gslt": "false",
+                "steam_update_on_start": "false",
+                "query_port": "27030",
+            },
+        )
+
+        self.assertEqual(response.status_code, 303)
+        async with self.session_maker() as session:
+            refreshed = await session.get(Server, server.id)
+            self.assertEqual(refreshed.query_port, 27030)
+            self.assertIn("27030", refreshed.start_command)
+
+    async def test_update_steam_settings_rejects_conflicting_query_port(self):
+        server = await self._create_server(
+            name="Steam Query Update",
+            steam_app_id="2394010",
+            query_port=8212,
+            port=8211,
+        )
+        await self._create_server(
+            name="Other Steam",
+            steam_app_id="2394010",
+            query_port=27030,
+            port=27029,
+        )
+
+        response = await self.client.post(
+            f"/servers/{server.id}/steam/settings",
+            data={
+                "steam_app_id": "2394010",
+                "steam_branch": "public",
+                "steam_login_anonymous": "true",
+                "steam_account_id": "",
+                "steam_gslt": "",
+                "clear_steam_gslt": "false",
+                "steam_update_on_start": "false",
+                "query_port": "27030",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Query port", response.text)
+
+    async def test_update_steam_settings_allows_unchanged_query_port(self):
+        server = await self._create_server(
+            name="Steam Query Update", steam_app_id="2394010", query_port=8212, port=8211
+        )
+
+        response = await self.client.post(
+            f"/servers/{server.id}/steam/settings",
+            data={
+                "steam_app_id": "2394010",
+                "steam_branch": "public",
+                "steam_login_anonymous": "true",
+                "steam_account_id": "",
+                "steam_gslt": "",
+                "clear_steam_gslt": "false",
+                "steam_update_on_start": "false",
+                "query_port": "8212",
+            },
+        )
+
+        self.assertEqual(response.status_code, 303)
+
+
     async def test_manual_update_and_validate_routes_queue_background_work(self):
         server = await self._create_server(name="Queue Ops")
 
         update_response = await self.client.post(f"/servers/{server.id}/steam/update")
         update_snapshot = servers.steamcmd.get_operation_snapshot(server.id)
-        validate_response = await self.client.post(
-            f"/servers/{server.id}/steam/validate"
-        )
+        validate_response = await self.client.post(f"/servers/{server.id}/steam/validate")
         validate_snapshot = servers.steamcmd.get_operation_snapshot(server.id)
 
         self.assertEqual(update_response.status_code, 303)
@@ -205,9 +297,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(validate_snapshot["operation"], "validate")
 
     async def test_start_route_queues_background_update_for_steam_update_on_start(self):
-        server = await self._create_server(
-            name="Queue Start", steam_update_on_start=True
-        )
+        server = await self._create_server(name="Queue Start", steam_update_on_start=True)
 
         with (
             patch.object(
@@ -227,9 +317,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         start_mock.assert_not_awaited()
 
     async def test_background_update_then_start_runs_update_before_start(self):
-        server = await self._create_server(
-            name="Update Then Start", steam_update_on_start=True
-        )
+        server = await self._create_server(name="Update Then Start", steam_update_on_start=True)
         events = []
 
         async def capture_event(**payload):
@@ -254,13 +342,9 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             patch.object(
                 servers.steamcmd,
                 "update_server",
-                AsyncMock(
-                    return_value={"ok": True, "build_id": "9002", "message": "updated"}
-                ),
+                AsyncMock(return_value={"ok": True, "build_id": "9002", "message": "updated"}),
             ) as update_mock,
-            patch.object(
-                servers.steamcmd, "_publish_event", AsyncMock(side_effect=capture_event)
-            ) as publish_mock,
+            patch.object(servers.steamcmd, "_publish_event", AsyncMock(side_effect=capture_event)) as publish_mock,
             patch.object(
                 servers.server_manager,
                 "start_server",
@@ -274,12 +358,8 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         start_mock.assert_awaited_once_with(server.id, skip_steam_update=True)
         reset_mock.assert_called_once_with(server.id)
         self.assertGreaterEqual(publish_mock.await_count, 2)
-        self.assertEqual(
-            events[0]["message"], "Steam update completed. Starting server..."
-        )
-        self.assertEqual(
-            events[-1]["message"], "Steam update completed. Server start requested."
-        )
+        self.assertEqual(events[0]["message"], "Steam update completed. Starting server...")
+        self.assertEqual(events[-1]["message"], "Steam update completed. Server start requested.")
 
         async with self.session_maker() as session:
             refreshed = await session.get(Server, server.id)
@@ -287,9 +367,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(refreshed.steam_last_update)
 
     async def test_background_update_then_start_does_not_start_on_failure(self):
-        server = await self._create_server(
-            name="Update Fails", steam_update_on_start=True
-        )
+        server = await self._create_server(name="Update Fails", steam_update_on_start=True)
 
         with (
             patch.object(
@@ -342,9 +420,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
                 "get_server_install_kwargs",
                 AsyncMock(return_value=({}, "Steam Guard is required.")),
             ),
-            patch.object(
-                servers.steamcmd, "_publish_event", AsyncMock(side_effect=capture_event)
-            ) as publish_mock,
+            patch.object(servers.steamcmd, "_publish_event", AsyncMock(side_effect=capture_event)) as publish_mock,
             patch.object(
                 servers.server_manager,
                 "start_server",
@@ -392,28 +468,28 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             "timestamp": "2026-04-19T00:00:00+00:00",
         }
 
-        with patch.object(
-            servers.steamcmd, "get_operation_snapshot", return_value=idle_snapshot
-        ):
+        with patch.object(servers.steamcmd, "get_operation_snapshot", return_value=idle_snapshot):
             response = await self.client.get(f"/servers/{server.id}")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(
-            "window.serverDetailStartingReloadTimer = window.setTimeout(function(){location.reload();}, 5000);",
+            "let hasSeenMeaningfulSteamActivity = "
+            "isMeaningfulSteamStatus(seededSteamOperationSnapshot && "
+            "seededSteamOperationSnapshot.status);",
             response.text,
         )
         self.assertIn('data-seeded-active-update-start="false"', response.text)
         self.assertIn("const activeUpdateStartStatuses = {", response.text)
         self.assertIn("const meaningfulSteamStatuses = {", response.text)
         self.assertIn(
-            "let hasSeenMeaningfulSteamActivity = isMeaningfulSteamStatus(seededSteamOperationSnapshot && seededSteamOperationSnapshot.status);",
+            "let hasSeenMeaningfulSteamActivity = "
+            "isMeaningfulSteamStatus(seededSteamOperationSnapshot && "
+            "seededSteamOperationSnapshot.status);",
             response.text,
         )
         self.assertIn("waiting_for_steam_guard: true", response.text)
         self.assertIn("function cancelStartingReloadTimer()", response.text)
-        self.assertIn(
-            "function isActiveUpdateStartOperation(event, currentStatus)", response.text
-        )
+        self.assertIn("function isActiveUpdateStartOperation(event, currentStatus)", response.text)
         self.assertIn("function isMeaningfulSteamStatus(currentStatus)", response.text)
         self.assertIn("event.operation === 'update_start'", response.text)
         self.assertIn(
@@ -444,9 +520,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             "timestamp": "2026-04-19T00:00:00+00:00",
         }
 
-        with patch.object(
-            servers.steamcmd, "get_operation_snapshot", return_value=active_snapshot
-        ):
+        with patch.object(servers.steamcmd, "get_operation_snapshot", return_value=active_snapshot):
             response = await self.client.get(f"/servers/{server.id}")
 
         self.assertEqual(response.status_code, 200)
@@ -456,7 +530,9 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn('data-seeded-active-update-start="true"', response.text)
         self.assertIn(
-            'id="steam-operation-message" class="text-xs" style="color: var(--clr-text-secondary);">Queued Steam update before start.</p>',
+            'id="steam-operation-message" class="text-xs" '
+            'style="color: var(--clr-text-secondary);">'
+            "Queued Steam update before start.</p>",
             response.text,
         )
         self.assertIn(
@@ -469,7 +545,9 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             response.text,
         )
         self.assertIn(
-            "let hasSeenMeaningfulSteamActivity = isMeaningfulSteamStatus(seededSteamOperationSnapshot && seededSteamOperationSnapshot.status);",
+            "let hasSeenMeaningfulSteamActivity = "
+            "isMeaningfulSteamStatus(seededSteamOperationSnapshot && "
+            "seededSteamOperationSnapshot.status);",
             response.text,
         )
         self.assertIn("if (isMeaningfulSteamStatus(currentStatus)) {", response.text)
@@ -490,9 +568,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             "if (event.operation === 'update_start' && event.type !== 'snapshot') {",
             response.text,
         )
-        self.assertIn(
-            "window.setTimeout(function() { location.reload(); }, 1200);", response.text
-        )
+        self.assertIn("window.setTimeout(function() { location.reload(); }, 1200);", response.text)
 
     async def test_workshop_add_and_update_queue_background_work(self):
         server = await self._create_server(name="Workshop Queue")
@@ -509,20 +585,12 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
 
         async with self.session_maker() as session:
             item = (
-                (
-                    await session.execute(
-                        select(WorkshopItem).where(WorkshopItem.server_id == server.id)
-                    )
-                )
-                .scalars()
-                .one()
+                (await session.execute(select(WorkshopItem).where(WorkshopItem.server_id == server.id))).scalars().one()
             )
             self.assertFalse(item.installed)
             item_id = item.id
 
-        update_response = await self.client.post(
-            f"/servers/{server.id}/workshop/{item_id}/update"
-        )
+        update_response = await self.client.post(f"/servers/{server.id}/workshop/{item_id}/update")
         self.assertEqual(update_response.status_code, 303)
         self.assertEqual(len(self.spawned), 2)
         update_snapshot = servers.steamcmd.get_operation_snapshot(server.id)
@@ -649,9 +717,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("+sv_setsteamaccount", refreshed.start_command)
 
     async def test_update_steam_settings_can_clear_existing_gslt(self):
-        server = await self._create_server(
-            name="GMod Clear", steam_app_id="4020", steam_gslt="existing-token"
-        )
+        server = await self._create_server(name="GMod Clear", steam_app_id="4020", steam_gslt="existing-token")
 
         response = await self.client.post(
             f"/servers/{server.id}/steam/settings",
@@ -675,9 +741,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
     async def test_steam_detail_page_renders_gmod_gslt_ui_and_guidance_only_for_gmod(
         self,
     ):
-        gmod_server = await self._create_server(
-            name="GMod Detail", steam_app_id="4020", steam_gslt="detail-token"
-        )
+        gmod_server = await self._create_server(name="GMod Detail", steam_app_id="4020", steam_gslt="detail-token")
         other_server = await self._create_server(name="CS2 Detail", steam_app_id="730")
 
         gmod_response = await self.client.get(f"/servers/{gmod_server.id}")
@@ -694,9 +758,7 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("base game app id", other_response.text)
 
     async def test_steam_detail_page_hides_minecraft_version_widgets(self):
-        server = await self._create_server(
-            name="Steam Version UI", steam_app_id="1690800"
-        )
+        server = await self._create_server(name="Steam Version UI", steam_app_id="1690800")
         async with self.session_maker() as session:
             refreshed = await session.get(Server, server.id)
             refreshed.mc_version = "26.1.2"
