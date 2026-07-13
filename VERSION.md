@@ -1,6 +1,11 @@
 # Version History
 
-## Current Version: 2.7.0
+## Current Version: 2.7.1
+
+### v2.7.1 -- TemplateResponse Deprecation Fix
+
+**Fixes:**
+- Updated all 37 `templates.TemplateResponse(...)` calls across `app/routers/` to the current Starlette signature (`request` as first positional argument, removed from context dict). This eliminates the deprecation warnings previously emitted on every test run and template render.
 
 ### v2.7.0 -- SteamCMD Backend & UX Improvements
 
@@ -338,6 +343,6 @@ FastAPI application scaffold, async SQLAlchemy + aiosqlite, Jinja2 + Tailwind CS
 - Crash Auto-Restart with configurable retry, delay, and stability window
 - CurseForge support removed (no free API keys)
 
-## Recent Changes (since v2.7.0)
+## Recent Changes (since v2.7.1)
 
 None yet.

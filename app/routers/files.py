@@ -278,10 +278,7 @@ async def browse_files(
                 }
             )
 
-    return templates.TemplateResponse(
-        "file_browser.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "file_browser.html", {
             "server": server,
             "entries": entries,
             "current_path": path,
@@ -290,8 +287,7 @@ async def browse_files(
             if path and path != "."
             else None,
             "embed": request.query_params.get("embed", "") == "1",
-        },
-    )
+        })
 
 
 async def _show_editor(request: Request, server: Server, rel_path: str, target: Path):
@@ -328,10 +324,7 @@ async def _show_editor(request: Request, server: Server, rel_path: str, target: 
                 }
             )
 
-    return templates.TemplateResponse(
-        "file_editor.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "file_editor.html", {
             "server": server,
             "file_path": rel_path,
             "file_name": target.name,
@@ -342,8 +335,7 @@ async def _show_editor(request: Request, server: Server, rel_path: str, target: 
             else "",
             "breadcrumbs": breadcrumbs,
             "embed": request.query_params.get("embed", "") == "1",
-        },
-    )
+        })
 
 
 @router.post("/{path:path}")

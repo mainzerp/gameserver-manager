@@ -31,16 +31,12 @@ async def scheduler_page(request: Request, db: AsyncSession = Depends(get_db)):
     servers = result.scalars().all()
     server_map = {s.id: s.name for s in servers}
 
-    return templates.TemplateResponse(
-        "scheduler.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "scheduler.html", {
             "tasks": tasks,
             "servers": servers,
             "server_map": server_map,
             "task_types": [t.value for t in TaskType],
-        },
-    )
+        })
 
 
 @router.post("/create")

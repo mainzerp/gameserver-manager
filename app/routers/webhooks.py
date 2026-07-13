@@ -23,14 +23,10 @@ async def webhook_list(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")
     result = await db.execute(select(Webhook).order_by(Webhook.created_at.desc()))
     webhooks = result.scalars().all()
-    return templates.TemplateResponse(
-        "webhooks.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "webhooks.html", {
             "webhooks": webhooks,
             "valid_events": VALID_EVENTS,
-        },
-    )
+        })
 
 
 @router.post("/create")

@@ -368,10 +368,7 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     )
     update_counts = dict(update_result.all())
 
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", {
             "servers": servers,
             "status_counts": status_counts,
             "update_counts": update_counts,
@@ -381,8 +378,7 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
             else [],
             "multi_node_enabled": settings.multi_node_enabled,
             "current_user": user,
-        },
-    )
+        })
 
 
 @router.get("/servers/create", response_class=HTMLResponse)
@@ -397,10 +393,7 @@ async def create_server_form(request: Request, db: AsyncSession = Depends(get_db
     from app.models.steam_account import SteamAccount
 
     steam_accounts = (await db.execute(select(SteamAccount))).scalars().all()
-    return templates.TemplateResponse(
-        "server_create.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "server_create.html", {
             "server_types": [t.value for t in ServerType],
             "steam_apps": steamcmd.get_known_apps(),
             "steamcmd_available": steamcmd.is_available,
@@ -412,8 +405,7 @@ async def create_server_form(request: Request, db: AsyncSession = Depends(get_db
             "presets": get_templates(),
             "nodes": nodes,
             "steam_accounts": steam_accounts,
-        },
-    )
+        })
 
 
 @router.post("/servers/create")
@@ -549,10 +541,7 @@ async def create_server(
         from app.models.steam_account import SteamAccount
 
         steam_accounts_err = (await db.execute(select(SteamAccount))).scalars().all()
-        return templates.TemplateResponse(
-            "server_create.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "server_create.html", {
                 "server_types": [t.value for t in ServerType],
                 "steam_apps": steamcmd.get_known_apps(),
                 "steamcmd_available": steamcmd.is_available,
@@ -564,8 +553,7 @@ async def create_server(
                 "presets": get_templates(),
                 "nodes": nodes,
                 "steam_accounts": steam_accounts_err,
-            },
-        )
+            })
 
     name = name.strip()
     os.makedirs(server_path, exist_ok=True)
@@ -704,14 +692,10 @@ async def create_server(
 
 @router.get("/servers/import", response_class=HTMLResponse)
 async def import_server_form(request: Request):
-    return templates.TemplateResponse(
-        "server_import.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "server_import.html", {
             "errors": [],
             "form_values": {},
-        },
-    )
+        })
 
 
 @router.post("/servers/detect", response_class=JSONResponse)
@@ -788,14 +772,10 @@ async def import_server(
             errors.append("A server already manages this directory.")
 
     if errors:
-        return templates.TemplateResponse(
-            "server_import.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "server_import.html", {
                 "errors": errors,
                 "form_values": form_values,
-            },
-        )
+            })
 
     resolved = str(p.resolve())
     st = ServerType(server_type)
@@ -851,14 +831,10 @@ ZIP_MAGIC = b"PK\x03\x04"  # Local file header signature
 @router.get("/servers/upload-zip", response_class=HTMLResponse)
 async def upload_zip_form(request: Request):
     await require_role(request, "admin")
-    return templates.TemplateResponse(
-        "server_upload_zip.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "server_upload_zip.html", {
             "errors": [],
             "form_values": {},
-        },
-    )
+        })
 
 
 @router.post("/servers/upload-zip")
@@ -911,30 +887,20 @@ async def upload_zip_server(
 
     if errors:
         await zip_file.close()
-        return templates.TemplateResponse(
-            "server_upload_zip.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "server_upload_zip.html", {
                 "errors": errors,
                 "form_values": form_values,
-            },
-            status_code=422,
-        )
+            }, status_code=422)
 
     # --- Check for duplicate server name ---
     existing_name = await db.execute(select(Server).where(Server.name == name))
     if existing_name.scalars().first():
         errors.append(f"A server named '{name}' already exists.")
         await zip_file.close()
-        return templates.TemplateResponse(
-            "server_upload_zip.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "server_upload_zip.html", {
                 "errors": errors,
                 "form_values": form_values,
-            },
-            status_code=422,
-        )
+            }, status_code=422)
 
     # --- Stream ZIP to a temp file with size limit + magic-byte check ---
     tmp_path = None
@@ -965,15 +931,10 @@ async def upload_zip_server(
                 tmp.write(chunk)
 
         if errors:
-            return templates.TemplateResponse(
-                "server_upload_zip.html",
-                {
-                    "request": request,
+            return templates.TemplateResponse(request, "server_upload_zip.html", {
                     "errors": errors,
                     "form_values": form_values,
-                },
-                status_code=422,
-            )
+                }, status_code=422)
 
         # --- Create destination directory ---
         safe_name = re.sub(r"[^\w\-]", "_", name.strip())[:30]
@@ -985,15 +946,10 @@ async def upload_zip_server(
             await asyncio.to_thread(_extract_archive, tmp_path, str(server_dir))
         except ValueError as e:
             errors.append(str(e))
-            return templates.TemplateResponse(
-                "server_upload_zip.html",
-                {
-                    "request": request,
+            return templates.TemplateResponse(request, "server_upload_zip.html", {
                     "errors": errors,
                     "form_values": form_values,
-                },
-                status_code=422,
-            )
+                }, status_code=422)
 
         # --- Strip single top-level directory (e.g. myserver.zip/myserver/*) ---
         # Move contents up rather than renaming across parent dirs (avoids
@@ -1055,15 +1011,10 @@ async def upload_zip_server(
     except Exception:
         logger.exception("ZIP upload failed")
         errors.append("An unexpected error occurred while processing the ZIP file.")
-        return templates.TemplateResponse(
-            "server_upload_zip.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "server_upload_zip.html", {
                 "errors": errors,
                 "form_values": form_values,
-            },
-            status_code=500,
-        )
+            }, status_code=500)
     finally:
         # Cleanup temp file always
         if tmp_path and os.path.exists(tmp_path):
@@ -1199,10 +1150,7 @@ async def server_detail(
     )
     steam_accounts = steam_accounts_result.scalars().all()
 
-    return templates.TemplateResponse(
-        "server_detail.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "server_detail.html", {
             "server": server,
             "mods": mods,
             "conflicts": conflicts,
@@ -1229,8 +1177,7 @@ async def server_detail(
             "steam_operation_snapshot": steam_operation_snapshot,
             "steam_has_active_update_start": steam_has_active_update_start,
             "workshop_items": workshop_items,
-        },
-    )
+        })
 
 
 @router.post("/servers/{server_id}/start")
@@ -1400,14 +1347,10 @@ async def workshop_page(
         select(WorkshopItem).where(WorkshopItem.server_id == server_id)
     )
     items = result.scalars().all()
-    return templates.TemplateResponse(
-        "workshop.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "workshop.html", {
             "server": server,
             "items": items,
-        },
-    )
+        })
 
 
 @router.post("/servers/{server_id}/workshop/add")

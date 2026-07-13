@@ -110,13 +110,9 @@ async def revoke_invite(
 
 @router.get("/invite/{code}", response_class=HTMLResponse)
 async def redeem_invite_page(request: Request, code: str):
-    return templates.TemplateResponse(
-        "invite_redeem.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "invite_redeem.html", {
             "code": code,
-        },
-    )
+        })
 
 
 @router.post("/invite/{code}")

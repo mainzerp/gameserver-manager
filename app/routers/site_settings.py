@@ -45,10 +45,7 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     from app.services.steamcmd import steamcmd
 
-    return templates.TemplateResponse(
-        "site_settings.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "site_settings.html", {
             "s": row,
             "smtp_events": SMTP_EVENTS,
             "discord_events": DISCORD_EVENTS,
@@ -57,8 +54,7 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db)):
             "saved": request.query_params.get("saved") == "1",
             "steam_accounts": steam_accounts,
             "steamcmd_available": steamcmd.is_available,
-        },
-    )
+        })
 
 
 @router.post("/", response_class=HTMLResponse)

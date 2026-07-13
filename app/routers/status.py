@@ -15,14 +15,10 @@ async def public_status_page(request: Request, db: AsyncSession = Depends(get_db
     if not settings.public_status_enabled:
         raise HTTPException(status_code=404)
     servers = await status_service.get_public_status(db)
-    return templates.TemplateResponse(
-        "status.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "status.html", {
             "servers": servers,
             "site_title": settings.app_name,
-        },
-    )
+        })
 
 
 @router.get("/status/json")

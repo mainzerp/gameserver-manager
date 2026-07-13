@@ -27,15 +27,11 @@ async def node_list(request: Request, db: AsyncSession = Depends(get_db)):
         count_result = await db.execute(select(Server).where(Server.node_id == node.id))
         node_server_counts[node.id] = len(count_result.scalars().all())
 
-    return templates.TemplateResponse(
-        "nodes.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "nodes.html", {
             "nodes": nodes,
             "node_server_counts": node_server_counts,
             "multi_node_enabled": settings.multi_node_enabled,
-        },
-    )
+        })
 
 
 @router.post("/create")

@@ -14,14 +14,10 @@ router = APIRouter(dependencies=[Depends(get_current_user_dep)])
 async def audit_log_page(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")
     entries, total = await audit_service.query(db, limit=50, offset=0)
-    return templates.TemplateResponse(
-        "audit_log.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "audit_log.html", {
             "entries": entries,
             "total": total,
-        },
-    )
+        })
 
 
 @router.get("/audit/data", response_class=JSONResponse)

@@ -26,14 +26,10 @@ async def user_list(request: Request, db: AsyncSession = Depends(get_db)):
     user = await _require_admin(request)
     result = await db.execute(select(User).order_by(User.created_at))
     users = result.scalars().all()
-    return templates.TemplateResponse(
-        "users.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "users.html", {
             "users": users,
             "current_user": user,
-        },
-    )
+        })
 
 
 @router.post("/create")
@@ -168,15 +164,11 @@ async def user_access_page(
     access_entries = result.scalars().all()
     access_map = {a.server_id: a.permission for a in access_entries}
 
-    return templates.TemplateResponse(
-        "user_access.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "user_access.html", {
             "target_user": target,
             "servers": servers,
             "access_map": access_map,
-        },
-    )
+        })
 
 
 @router.post("/{user_id}/access")

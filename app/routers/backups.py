@@ -27,14 +27,10 @@ async def list_backups(
 
     backups = await backup_manager.list_backups(server_id)
 
-    return templates.TemplateResponse(
-        "backups.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "backups.html", {
             "server": server,
             "backups": backups,
-        },
-    )
+        })
 
 
 @router.post("/servers/{server_id}/backups/create")

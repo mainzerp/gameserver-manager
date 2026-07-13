@@ -22,14 +22,10 @@ async def list_api_keys(request: Request, db: AsyncSession = Depends(get_db)):
         .order_by(ApiKey.created_at.desc())
     )
     keys = result.scalars().all()
-    return templates.TemplateResponse(
-        "api_keys.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "api_keys.html", {
             "keys": keys,
             "new_key": None,
-        },
-    )
+        })
 
 
 @router.post("/create")
@@ -56,14 +52,10 @@ async def create_api_key(
     )
     keys = result.scalars().all()
 
-    return templates.TemplateResponse(
-        "api_keys.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "api_keys.html", {
             "keys": keys,
             "new_key": raw_key,
-        },
-    )
+        })
 
 
 @router.post("/{key_id}/revoke")

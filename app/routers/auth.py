@@ -70,14 +70,10 @@ async def login_page(request: Request, error: str = ""):
 
     if request.session.get("user_id"):
         return RedirectResponse(url="/", status_code=303)
-    return templates.TemplateResponse(
-        "login.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "login.html", {
             "error": error,
             "webauthn_available": webauthn_service.is_available(),
-        },
-    )
+        })
 
 
 @router.post("/login")
@@ -173,13 +169,9 @@ async def logout(request: Request):
 async def totp_verify_page(request: Request):
     if not request.session.get("pending_2fa_user"):
         return RedirectResponse(url="/login", status_code=303)
-    return templates.TemplateResponse(
-        "totp_verify.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "totp_verify.html", {
             "error": "",
-        },
-    )
+        })
 
 
 @router.post("/login/2fa")
@@ -199,13 +191,9 @@ async def totp_verify(
         return RedirectResponse(url="/login", status_code=303)
 
     if not _check_totp_rate_limit(user_id):
-        return templates.TemplateResponse(
-            "totp_verify.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "totp_verify.html", {
                 "error": "Too many attempts. Please wait before trying again.",
-            },
-        )
+            })
 
     if (
         code
@@ -245,13 +233,9 @@ async def totp_verify(
             )
             return RedirectResponse(url="/", status_code=303)
 
-    return templates.TemplateResponse(
-        "totp_verify.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "totp_verify.html", {
             "error": "Invalid verification code.",
-        },
-    )
+        })
 
 
 @router.get("/settings/2fa/setup", response_class=HTMLResponse)
@@ -266,16 +250,12 @@ async def totp_setup_page(request: Request):
     img.save(buf, format="PNG")
     qr_b64 = base64.b64encode(buf.getvalue()).decode()
     request.session["pending_totp_secret"] = secret
-    return templates.TemplateResponse(
-        "totp_setup.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "totp_setup.html", {
             "qr_b64": qr_b64,
             "secret": secret,
             "error": "",
             "recovery_codes": None,
-        },
-    )
+        })
 
 
 @router.post("/settings/2fa/setup")
@@ -297,16 +277,12 @@ async def totp_setup_confirm(
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         qr_b64 = base64.b64encode(buf.getvalue()).decode()
-        return templates.TemplateResponse(
-            "totp_setup.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "totp_setup.html", {
                 "qr_b64": qr_b64,
                 "secret": secret,
                 "error": "Invalid code. Please try again.",
                 "recovery_codes": None,
-            },
-        )
+            })
 
     recovery_codes = generate_recovery_codes()
 
@@ -320,16 +296,12 @@ async def totp_setup_confirm(
     ctx = get_audit_context(request)
     audit_service.create_task(audit_service.log(**ctx, action="auth.2fa_enabled"))
 
-    return templates.TemplateResponse(
-        "totp_setup.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "totp_setup.html", {
             "qr_b64": "",
             "secret": "",
             "error": "",
             "recovery_codes": recovery_codes,
-        },
-    )
+        })
 
 
 @router.post("/settings/2fa/disable")
@@ -359,13 +331,9 @@ async def setup_page(request: Request, db: AsyncSession = Depends(get_db)):
     count = result.scalar()
     if count > 0:
         return RedirectResponse(url="/", status_code=303)
-    return templates.TemplateResponse(
-        "setup.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "setup.html", {
             "error": "",
-        },
-    )
+        })
 
 
 @router.post("/setup")
@@ -396,13 +364,9 @@ async def setup(
         error = "Passwords do not match."
 
     if error:
-        return templates.TemplateResponse(
-            "setup.html",
-            {
-                "request": request,
+        return templates.TemplateResponse(request, "setup.html", {
                 "error": error,
-            },
-        )
+            })
 
     user = User(
         username=username,
@@ -454,16 +418,12 @@ async def webauthn_register_page(request: Request, db: AsyncSession = Depends(ge
         select(WebAuthnCredential).where(WebAuthnCredential.user_id == user.id)
     )
     credentials = result.scalars().all()
-    return templates.TemplateResponse(
-        "webauthn_register.html",
-        {
-            "request": request,
+    return templates.TemplateResponse(request, "webauthn_register.html", {
             "credentials": credentials,
             "webauthn_available": webauthn_service.is_available(),
             "flash": request.session.pop("flash", None),
             "error": request.session.pop("flash_error", None),
-        },
-    )
+        })
 
 
 @router.post("/auth/webauthn/register/options")
