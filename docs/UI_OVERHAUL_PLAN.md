@@ -19,65 +19,70 @@ Tone keywords: precise, technical, calm-under-pressure, high-contrast, utilitari
 
 ---
 
-## 2. Color Palette
+## 2. Color Palette (Hermod-inspired warm dark)
+
+The palette orients on the Hermod design system: a warm, dark foundation with an amber primary accent and muted semantic colors. This avoids the current indigo/purple SaaS look and feels more like a premium technical tool.
 
 ### 2.1 Background Layers
 
 | Token | Dark Mode | Light Mode | Usage |
 |-------|-----------|------------|-------|
-| `--clr-bg` | `#080a10` | `#f4f6f8` | Page background |
-| `--clr-surface-1` | `#0e1220` | `#ffffff` | Cards, panels |
-| `--clr-surface-2` | `#141a2b` | `#f8fafc` | Inputs, table headers, hover states |
-| `--clr-surface-3` | `#1c233a` | `#eef2f7` | Active/highlighted rows, subtle elevation |
-| `--clr-toolbar` | `#11162a` | `#eef2f7` | Toolbars, bulk-action bars |
+| `--clr-bg` | `#0d0c0a` | `#f5f2ee` | Page background |
+| `--clr-surface-1` | `#12110f` | `#ffffff` | Cards, panels |
+| `--clr-surface-2` | `#1a1816` | `#ece8e2` | Inputs, table headers, hover states |
+| `--clr-surface-3` | `#242220` | `#d5d0ca` | Active/highlighted rows, subtle elevation |
+| `--clr-toolbar` | `#11110e` | `#ece8e2` | Toolbars, bulk-action bars |
+| `--clr-elevated` | `#2e2b28` | `#e0dcd6` | Dropdowns, modals, popovers |
 
 ### 2.2 Text
 
 | Token | Dark Mode | Light Mode | Usage |
 |-------|-----------|------------|-------|
-| `--clr-text-primary` | `#e8eef7` | `#0f172a` | Headlines, primary text |
-| `--clr-text-secondary` | `#9fb0cc` | `#475569` | Body, descriptions |
-| `--clr-text-muted` | `#5f6f8e` | `#94a3b8` | Timestamps, meta data |
-| `--clr-text-inverse` | `#080a10` | `#ffffff` | Text on accent buttons |
+| `--clr-text-primary` | `#ece8e2` | `#1a1816` | Headlines, primary text |
+| `--clr-text-secondary` | `#b5b0aa` | `#3d3935` | Body, descriptions |
+| `--clr-text-muted` | `#8a8580` | `#5a5550` | Timestamps, meta data |
+| `--clr-text-inverse` | `#0d0c0a` | `#ffffff` | Text on accent buttons |
 
 ### 2.3 Accent & Interaction
 
 | Token | Dark Mode | Light Mode | Usage |
 |-------|-----------|------------|-------|
-| `--clr-accent` | `#00d4ff` | `#0ea5e9` | Primary actions, links, active states |
-| `--clr-accent-hover` | `#66e5ff` | `#0284c7` | Hover |
-| `--clr-accent-subtle` | `rgba(0, 212, 255, 0.10)` | `rgba(14, 165, 233, 0.10)` | Soft backgrounds for accents |
-| `--clr-accent-glow` | `rgba(0, 212, 255, 0.35)` | `rgba(14, 165, 233, 0.25)` | Glows, focus rings |
+| `--clr-accent` | `#e2a84b` | `#c4923f` | Primary actions, links, active states |
+| `--clr-accent-hover` | `#f5c26b` | `#d4a045` | Hover |
+| `--clr-accent-subtle` | `rgba(226, 168, 75, 0.12)` | `rgba(196, 146, 63, 0.12)` | Soft backgrounds for accents |
+| `--clr-accent-glow` | `rgba(226, 168, 75, 0.35)` | `rgba(196, 146, 63, 0.30)` | Glows, focus rings |
 
-### 2.4 Status Colors (kept bold)
+### 2.4 Status Colors
 
 | Status | Dark | Light | Usage |
 |--------|------|-------|-------|
-| Success | `#22c55e` | `#16a34a` | Running, online, OK |
-| Warning | `#f59e0b` | `#d97706` | Starting, warnings, update available |
-| Danger | `#ef4444` | `#dc2626` | Crashed, stopped, errors |
-| Info | `#38bdf8` | `#2563eb` | Info badges, tips |
+| Success | `#7dab8c` | `#5e8a6c` | Running, online, OK |
+| Warning | `#e2a84b` | `#c4923f` | Starting, warnings, update available |
+| Danger | `#d4756b` | `#b8635a` | Crashed, stopped, errors |
+| Info | `#8fb4cc` | `#5c8aa3` | Info badges, tips |
 
 ### 2.5 Special Server-Type Colors
 
-Optionally, distinguish server types by a subtle color code:
-- Minecraft Java: amber/gold accent (`--clr-mc: #f59e0b`)
-- Minecraft Bedrock: emerald (`--clr-bedrock: #34d399`)
-- Steam: cyan (`--clr-steam: #00d4ff`)
+Small, consistent color coding by server type (icon, left border, type badge):
+- Minecraft Java: `#e2a84b` (amber gold)
+- Minecraft Bedrock: `#7dab8c` (sage green)
+- Steam: `#8fb4cc` (cool blue-grey, to contrast the warm palette)
 
-These are used only as small indicators (icons, left borders, status dots) so the UI stays cohesive.
+These are used only as small indicators so the UI stays cohesive.
 
 ---
 
-## 3. Typography
+## 3. Typography (Hermod-oriented)
 
-Current fonts: Inter + JetBrains Mono. To escape the generic look, switch to a more characterful pairing:
+Hermod uses `DM Sans` for UI text and `Fira Code` for monospace. For this project we will use the same pairing to match the warm, modern aesthetic:
 
-- **Display / headings**: `Space Grotesk` or `Satoshi` — geometric, modern, slightly technical.
-- **Body / UI**: `Geist` or `Manrope` — clean, contemporary, good density.
-- **Monospace**: keep `JetBrains Mono` for console, file paths, ports, logs.
+- **Display / headings**: `DM Sans` (geometric, friendly, technical).
+- **Body / UI**: `DM Sans` at 400/500/600 weights.
+- **Monospace**: `Fira Code` for console, file paths, ports, logs.
 
-Font sizes stay practical (14–16px body), but headings get slightly more weight and tighter letter-spacing to feel editorial.
+Font sizes stay practical (14–16px body), headings get slightly more weight and tighter letter-spacing.
+
+Implementation note: fonts are currently self-hosted via Dockerfile. We will either switch the Dockerfile to download DM Sans and Fira Code, or keep the current `Inter` + `JetBrains Mono` for Phase 1 and change fonts in a dedicated font phase. For Phase 1 the color overhaul takes priority; fonts can follow immediately after.
 
 ---
 
