@@ -10,7 +10,7 @@
 {% set steam_active_update_start = steam_has_active_update_start %}
 {% set steam_operation_active = steam_operation_active %}
 <!-- Server Header -->
-<div class="mb-6">
+<div class="sticky top-14 z-20 -mx-6 px-6 py-4 mb-6" style="background: var(--clr-bg); border-bottom: 1px solid var(--clr-border); backdrop-filter: blur(8px);">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold" style="color:var(--clr-text-primary);">{{ server.name }}</h1>
@@ -375,23 +375,6 @@
         </div>
     </div>
     {% endif %}
-
-    <!-- Recent Events -->
-    {% if recent_events %}
-    <div class="card mb-6 mt-6">
-        <div class="card-header">Recent Events</div>
-        <div class="card-body">
-            <div class="space-y-2 text-sm">
-                {% for event in recent_events %}
-                <div class="flex items-center justify-between py-1" {% if not loop.last %}style="border-bottom: 1px solid var(--clr-border);"{% endif %}>
-                    <span style="color: var(--clr-text-primary);">{{ event.action }}</span>
-                    <span class="text-xs font-mono" style="color: var(--clr-text-muted);">{{ event.timestamp.strftime('%d.%m.%Y %H:%M') }}</span>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
 <!-- ============================== -->
@@ -579,8 +562,6 @@
     </div>
 </div>
 
-<!-- ============================== -->
-<!-- TAB: Settings                  -->
 <!-- ============================== -->
 <!-- TAB: Settings                  -->
 <!-- ============================== -->

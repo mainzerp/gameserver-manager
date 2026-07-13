@@ -1,6 +1,24 @@
 # Version History
 
-## Current Version: 2.7.7
+## Current Version: 2.8.0
+
+### v2.8.0 -- Phase 2 Core UI Redesign
+
+**Added:**
+- Hero stat cards on the dashboard showing Total Servers, Running and Stopped/Crashed counts at a glance.
+- Server cards now display a colored left status strip (green for running, amber for starting, red for crashed, neutral for stopped).
+
+**Changed:**
+- Login page redesigned with the Hermod-inspired warm dark palette, atmospheric background, card hover glow and consistent input/button styling.
+- Dashboard server card title now highlights on hover using the new `.server-card-title` utility.
+- Tab navigation switched from underline style to a pill/segment-control style with an accent fill for the active tab.
+- Server detail header is now sticky with a blurred background so key actions remain visible while scrolling.
+- Tailwind CSS rebuilt to include new dashboard utility classes.
+
+**Fixed:**
+- Removed duplicate `quickAction` JavaScript body in `dashboard.html` that was causing a syntax error.
+- Removed duplicate "Recent Events" section from the server detail overview tab.
+- Removed duplicate "TAB: Settings" comment block in `server_detail.html`.
 
 ### v2.7.7 -- UI & Java Compatibility Fixes
 
