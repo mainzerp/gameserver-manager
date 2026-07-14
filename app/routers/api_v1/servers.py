@@ -24,6 +24,7 @@ from app.services.server_manager import server_manager
 from app.services.server_templates import get_templates
 from app.services.server_updater import server_updater
 from app.services.steamcmd import steamcmd
+from app.services.task_registry import task_registry
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/servers", dependencies=[Depends(get_current_user_fle
 
 
 def _spawn_background_task(coro):
-    asyncio.create_task(coro)
+    task_registry.spawn(coro)
 
 
 
@@ -60,7 +61,7 @@ async def list_servers(request: Request, db: AsyncSession = Depends(get_db)):
                 "type": s.server_type.value,
                 "status": s.status.value,
                 "port": s.port,
-                "running": server_manager.is_running(s.id),
+                "running": server_manager.is_running(s.id, db=db),
             }
         )
     return JSONResponse({"ok": True, "data": data})
@@ -94,7 +95,7 @@ async def get_server(
                 "min_memory": server.min_memory,
                 "max_memory": server.max_memory,
                 "auto_start": server.auto_start,
-                "running": server_manager.is_running(server.id),
+                "running": server_manager.is_running(server.id, db=db),
                 "created_at": server.created_at.isoformat()
                 if server.created_at
                 else None,
@@ -109,7 +110,7 @@ async def start_server(
 ):
     """Start a stopped server process."""
     await require_server_access(request, server_id, "operate", db)
-    result = await server_manager.start_server(server_id)
+    result = await server_manager.start_server(server_id, db=db)
     if not result["ok"]:
         return JSONResponse({"ok": False, "error": result["error"]}, status_code=400)
     return JSONResponse({"ok": True, "data": {"status": "started"}})
@@ -121,7 +122,7 @@ async def stop_server(
 ):
     """Stop a running server process."""
     await require_server_access(request, server_id, "operate", db)
-    success = await server_manager.stop_server(server_id)
+    success = await server_manager.stop_server(server_id, db=db)
     if not success:
         return JSONResponse(
             {"ok": False, "error": "Failed to stop server"}, status_code=400
@@ -135,9 +136,9 @@ async def restart_server(
 ):
     """Stop then start a server process."""
     await require_server_access(request, server_id, "operate", db)
-    await server_manager.stop_server(server_id)
+    await server_manager.stop_server(server_id, db=db)
     await asyncio.sleep(2)
-    result = await server_manager.start_server(server_id)
+    result = await server_manager.start_server(server_id, db=db)
     if not result["ok"]:
         return JSONResponse({"ok": False, "error": result["error"]}, status_code=400)
     return JSONResponse({"ok": True, "data": {"status": "restarted"}})
@@ -152,7 +153,7 @@ async def send_command(
 ):
     """Send a console command to a running server."""
     await require_server_access(request, server_id, "operate", db)
-    success = await server_manager.send_command(server_id, body.command)
+    success = await server_manager.send_command(server_id, body.command, db=db)
     if not success:
         return JSONResponse(
             {"ok": False, "error": "Server is not running"}, status_code=400
@@ -170,7 +171,7 @@ async def server_stats(
     if not server:
         return JSONResponse({"ok": False, "error": "Server not found"}, status_code=404)
 
-    if server_manager.is_running(server_id):
+    if server_manager.is_running(server_id, db=db):
         sp = server_manager.processes.get(server_id)
         process_stats = None
         if sp and sp.process.pid:

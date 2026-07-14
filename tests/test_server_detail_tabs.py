@@ -16,6 +16,17 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.database import Base
 from app.models.server import Server, ServerStatus, ServerType
 from app.routers import servers
+from app.routers.servers import (
+    server_config,
+    server_control,
+    server_core,
+    server_crud,
+    server_logs,
+    server_misc,
+    server_players,
+    server_steam,
+    server_worlds,
+)
 
 
 class ServerDetailTabVisibilityTests(unittest.IsolatedAsyncioTestCase):
@@ -59,11 +70,27 @@ class ServerDetailTabVisibilityTests(unittest.IsolatedAsyncioTestCase):
         self.original_servers_dir = servers.settings.servers_dir
         servers.settings.servers_dir = self.temp_dir.name
 
-        self.access_patch = patch.object(
-            servers,
-            "require_server_access",
-            AsyncMock(return_value=SimpleNamespace(id=1, role="admin")),
-        )
+        self.access_patches = []
+        for module in (
+            server_config,
+            server_control,
+            server_core,
+            server_crud,
+            server_logs,
+            server_misc,
+            server_players,
+            server_steam,
+            server_worlds,
+        ):
+            if hasattr(module, "require_server_access"):
+                self.access_patches.append(
+                    patch.object(
+                        module,
+                        "require_server_access",
+                        AsyncMock(return_value=SimpleNamespace(id=1, role="admin")),
+                    )
+                )
+
         self.conflicts_patch = patch.object(
             servers.mod_updater, "check_conflicts", AsyncMock(return_value=[])
         )
@@ -86,7 +113,8 @@ class ServerDetailTabVisibilityTests(unittest.IsolatedAsyncioTestCase):
             servers.player_manager, "get_banned_players", return_value=[]
         )
 
-        self.access_patch.start()
+        for p in self.access_patches:
+            p.start()
         self.conflicts_patch.start()
         self.check_update_mock = self.update_patch.start()
         self.logs_patch.start()
@@ -96,7 +124,8 @@ class ServerDetailTabVisibilityTests(unittest.IsolatedAsyncioTestCase):
         self.banned_patch.start()
 
     async def asyncTearDown(self):
-        self.access_patch.stop()
+        for p in self.access_patches:
+            p.stop()
         self.conflicts_patch.stop()
         self.update_patch.stop()
         self.logs_patch.stop()

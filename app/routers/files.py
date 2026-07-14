@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Upl
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.server import Server
 from app.services.audit_service import audit_service, get_audit_context
@@ -60,7 +61,7 @@ BLOCKED_NAMES = {"..", "~"}
 MAX_EDIT_SIZE = 2 * 1024 * 1024
 
 # Max file size for upload (50 MB)
-MAX_UPLOAD_SIZE = 50 * 1024 * 1024
+MAX_UPLOAD_SIZE = settings.max_upload_size_mb * 1024 * 1024
 
 
 def _safe_resolve(server_path: str, rel_path: str) -> Path:
@@ -164,6 +165,69 @@ _BINARY_EXTENSIONS = {
 }
 
 
+def _should_skip_file(fpath: Path, max_file_size: int) -> bool:
+    """Skip binary files and files exceeding the max search size."""
+    ext = fpath.suffix.lower()
+    if ext in _BINARY_EXTENSIONS:
+        return True
+    try:
+        if fpath.stat().st_size > max_file_size:
+            return True
+    except OSError:
+        return True
+    return False
+
+
+def _search_file(
+    fpath: Path, base: Path, query_lower: str, remaining: int
+) -> list[dict]:
+    """Search a single file for query matches and return up to *remaining* hits."""
+    matches: list[dict] = []
+    try:
+        rel = str(fpath.relative_to(base)).replace(os.sep, "/")
+        with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+            for line_num, line in enumerate(f, 1):
+                if query_lower not in line.lower():
+                    continue
+                snippet = line.strip()
+                if len(snippet) > 200:
+                    snippet = snippet[:200] + "..."
+                matches.append({"path": rel, "line": line_num, "content": snippet})
+                if len(matches) >= remaining:
+                    break
+    except (OSError, UnicodeDecodeError):
+        pass
+    return matches
+
+
+def _search(
+    base: Path,
+    query_lower: str,
+    max_results: int,
+    max_file_size: int,
+    max_depth: int,
+) -> list[dict]:
+    """Walk *base* and collect text file matches for *query_lower*."""
+    results: list[dict] = []
+    for root, dirs, filenames in os.walk(str(base)):
+        depth = str(Path(root).resolve()).replace(str(base), "").count(os.sep)
+        if depth > max_depth:
+            dirs.clear()
+            continue
+        for fname in filenames:
+            if len(results) >= max_results:
+                return results
+            fpath = Path(root) / fname
+            if _should_skip_file(fpath, max_file_size):
+                continue
+            remaining = max_results - len(results)
+            for match in _search_file(fpath, base, query_lower, remaining):
+                results.append(match)
+                if len(results) >= max_results:
+                    return results
+    return results
+
+
 @router.get("/search/", response_class=JSONResponse)
 async def search_files(
     request: Request,
@@ -179,48 +243,14 @@ async def search_files(
         raise HTTPException(status_code=404, detail="Server not found")
 
     base = Path(server.path).resolve()
-    query_lower = q.lower()
-    results = []
-    max_results = 100
-    max_file_size = 1 * 1024 * 1024  # 1 MB
-    max_depth = 10
-
-    def _search():
-        for root, dirs, filenames in os.walk(str(base)):
-            depth = str(Path(root).resolve()).replace(str(base), "").count(os.sep)
-            if depth > max_depth:
-                dirs.clear()
-                continue
-            for fname in filenames:
-                if len(results) >= max_results:
-                    return
-                ext = Path(fname).suffix.lower()
-                if ext in _BINARY_EXTENSIONS:
-                    continue
-                fpath = Path(root) / fname
-                if fpath.stat().st_size > max_file_size:
-                    continue
-                try:
-                    rel = str(fpath.relative_to(base)).replace(os.sep, "/")
-                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                        for line_num, line in enumerate(f, 1):
-                            if query_lower in line.lower():
-                                snippet = line.strip()
-                                if len(snippet) > 200:
-                                    snippet = snippet[:200] + "..."
-                                results.append(
-                                    {
-                                        "path": rel,
-                                        "line": line_num,
-                                        "content": snippet,
-                                    }
-                                )
-                                if len(results) >= max_results:
-                                    return
-                except (OSError, UnicodeDecodeError):
-                    continue
-
-    await asyncio.to_thread(_search)
+    results = await asyncio.to_thread(
+        _search,
+        base,
+        q.lower(),
+        settings.file_search_max_results,
+        settings.file_search_max_file_size,
+        settings.file_search_max_depth,
+    )
     return _JSONResponse({"results": results, "query": q, "total": len(results)})
 
 
@@ -313,7 +343,7 @@ async def _show_editor(request: Request, server: Server, rel_path: str, target: 
 
     try:
         content = target.read_text(encoding="utf-8", errors="replace")
-    except Exception as e:
+    except (OSError, PermissionError, UnicodeDecodeError) as e:
         raise HTTPException(status_code=500, detail=f"Error reading file: {e}")
 
     # Build breadcrumbs for the editor
@@ -371,7 +401,7 @@ async def save_file(
     try:
         temp_path.write_text(content, encoding="utf-8")
         os.replace(str(temp_path), str(target))
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         temp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
 
@@ -448,7 +478,7 @@ async def upload_file(
     except HTTPException:
         dest.unlink(missing_ok=True)
         raise
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         dest.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
 
@@ -467,6 +497,30 @@ async def upload_file(
         url=f"/servers/{server_id}/files/{path}{_embed_suffix(request)}",
         status_code=303,
     )
+
+
+async def _write_upload(file, dest: Path, max_size: int) -> tuple[bool, str | None]:
+    """Write a single upload to *dest* capped at *max_size*. Returns (ok, error)."""
+    try:
+        total = 0
+        size_exceeded = False
+        with open(dest, "wb") as out_f:
+            while True:
+                chunk = await file.read(65536)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_size:
+                    size_exceeded = True
+                    break
+                out_f.write(chunk)
+        if size_exceeded:
+            dest.unlink(missing_ok=True)
+            return False, "exceeds 50 MB limit"
+        return True, None
+    except (OSError, PermissionError) as e:
+        dest.unlink(missing_ok=True)
+        return False, str(e)
 
 
 @router.post("/upload-multi/")
@@ -498,27 +552,11 @@ async def upload_files_multi(
         dest = _safe_resolve(
             server.path, str(PurePosixPath(path) / filename) if path else filename
         )
-        try:
-            total = 0
-            size_exceeded = False
-            with open(dest, "wb") as out_f:
-                while True:
-                    chunk = await file.read(65536)
-                    if not chunk:
-                        break
-                    total += len(chunk)
-                    if total > MAX_UPLOAD_SIZE:
-                        size_exceeded = True
-                        break
-                    out_f.write(chunk)
-            if size_exceeded:
-                dest.unlink(missing_ok=True)
-                errors.append(f"{filename}: exceeds 50 MB limit")
-            else:
-                uploaded.append(filename)
-        except Exception as e:
-            dest.unlink(missing_ok=True)
-            errors.append(f"{filename}: {e}")
+        ok, err = await _write_upload(file, dest, MAX_UPLOAD_SIZE)
+        if ok:
+            uploaded.append(filename)
+        else:
+            errors.append(f"{filename}: {err}")
 
     if uploaded:
         ctx = get_audit_context(request)
@@ -586,7 +624,7 @@ async def delete_file(
             target.unlink()
         elif target.is_dir():
             shutil.rmtree(target)
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         raise HTTPException(status_code=500, detail=f"Error deleting: {e}")
 
     ctx = get_audit_context(request)
@@ -645,7 +683,7 @@ async def rename_file(
 
     try:
         target.rename(new_path)
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         raise HTTPException(status_code=500, detail=f"Error renaming: {e}")
 
     parent = str(PurePosixPath(path).parent)
@@ -685,7 +723,7 @@ async def make_directory(
 
     try:
         os.makedirs(new_dir)
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         raise HTTPException(status_code=500, detail=f"Error creating directory: {e}")
 
     return RedirectResponse(
@@ -694,8 +732,8 @@ async def make_directory(
     )
 
 
-MAX_EXTRACT_SIZE = 20 * 1024 * 1024 * 1024  # 20 GB
-MAX_EXTRACT_FILES = 10000
+MAX_EXTRACT_SIZE = settings.max_extract_size_gb * 1024 * 1024 * 1024
+MAX_EXTRACT_FILES = settings.max_extract_files
 
 
 def _compress_path(source: str, dest_zip: str):
@@ -769,7 +807,7 @@ async def compress_path(
 
     try:
         await asyncio.to_thread(_compress_path, str(target), str(output_zip))
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         raise HTTPException(status_code=500, detail=f"Compression failed: {e}")
 
     parent = str(PurePosixPath(path).parent)
@@ -806,7 +844,7 @@ async def extract_archive(
         await asyncio.to_thread(_extract_archive, str(target), str(extract_dir))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (OSError, PermissionError, zipfile.BadZipFile) as e:
         raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
 
     parent = str(PurePosixPath(path).parent)
@@ -850,7 +888,7 @@ async def bulk_delete(
             elif target.is_file():
                 target.unlink()
                 deleted.append(clean)
-        except Exception:
+        except (OSError, PermissionError):
             pass
 
     if deleted:
@@ -909,7 +947,7 @@ async def bulk_download(
                             fp = Path(root) / f
                             arcname = os.path.join(clean, str(fp.relative_to(target)))
                             zf.write(fp, arcname)
-    except Exception as e:
+    except (OSError, PermissionError, zipfile.BadZipFile) as e:
         os.unlink(tmp_name)
         raise HTTPException(status_code=500, detail=f"Error creating zip: {e}")
 

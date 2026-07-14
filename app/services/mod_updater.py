@@ -83,7 +83,61 @@ class ModUpdater:
 
     # ── Conflict Detection ─────────────────────────────────────
 
-    async def check_conflicts(self, server_id: int, db: AsyncSession) -> list[dict]:
+    async def check_conflicts(
+        self, server_id: int, db: AsyncSession | None = None
+    ) -> list[dict]:
+        if db is None:
+            async with async_session() as db:
+                return await self._check_conflicts_impl(server_id, db)
+        return await self._check_conflicts_impl(server_id, db)
+
+    async def _fetch_modrinth_versions(self, version_ids: list[str]) -> dict[str, dict]:
+        """Fetch version metadata from Modrinth and return a {version_id: data} map."""
+        try:
+            client = await self._get_client()
+            resp = await client.get(
+                f"{settings.modrinth_api_url}/versions",
+                params={"ids": json.dumps(version_ids)},
+            )
+            if resp.status_code != 200:
+                return {}
+            return {v["id"]: v for v in resp.json()}
+        except Exception as e:
+            logger.debug(f"Error fetching versions from Modrinth: {e}")
+            return {}
+
+    @staticmethod
+    def _build_incompatible_conflicts(
+        modrinth_mods: list[Mod], all_versions: dict[str, dict]
+    ) -> list[dict]:
+        """Build conflict records from incompatible dependencies."""
+        installed_ids = {m.project_id for m in modrinth_mods}
+        conflicts = []
+        for mod in modrinth_mods:
+            version_data = all_versions.get(mod.version_id, {})
+            for dep in version_data.get("dependencies", []):
+                if dep.get("dependency_type") != "incompatible":
+                    continue
+                dep_project = dep.get("project_id")
+                if not dep_project or dep_project not in installed_ids:
+                    continue
+                conflict_mod = next(
+                    (m for m in modrinth_mods if m.project_id == dep_project),
+                    None,
+                )
+                if conflict_mod:
+                    conflicts.append(
+                        {
+                            "mod_name": mod.name,
+                            "conflicts_with": conflict_mod.name,
+                            "reason": "Marked as incompatible on Modrinth",
+                        }
+                    )
+        return conflicts
+
+    async def _check_conflicts_impl(
+        self, server_id: int, db: AsyncSession
+    ) -> list[dict]:
         now = datetime.now(timezone.utc)
         if server_id in self._conflict_cache:
             cached_time, cached_data = self._conflict_cache[server_id]
@@ -98,44 +152,14 @@ class ModUpdater:
             self._conflict_cache[server_id] = (now, [])
             return []
 
-        installed_ids = {m.project_id for m in modrinth_mods}
-        conflicts = []
-
-        try:
-            client = await self._get_client()
-            version_ids = [m.version_id for m in modrinth_mods if m.version_id]
-            resp = await client.get(
-                f"{settings.modrinth_api_url}/versions",
-                params={"ids": json.dumps(version_ids)},
-            )
-            if resp.status_code != 200:
-                self._conflict_cache[server_id] = (now, [])
-                return []
-            all_versions = {v["id"]: v for v in resp.json()}
-        except Exception as e:
-            logger.debug(f"Error fetching versions from Modrinth: {e}")
+        all_versions = await self._fetch_modrinth_versions(
+            [m.version_id for m in modrinth_mods if m.version_id]
+        )
+        if not all_versions:
             self._conflict_cache[server_id] = (now, [])
             return []
 
-        for mod in modrinth_mods:
-            version_data = all_versions.get(mod.version_id, {})
-            for dep in version_data.get("dependencies", []):
-                if dep.get("dependency_type") == "incompatible":
-                    dep_project = dep.get("project_id")
-                    if dep_project and dep_project in installed_ids:
-                        conflict_mod = next(
-                            (m for m in modrinth_mods if m.project_id == dep_project),
-                            None,
-                        )
-                        if conflict_mod:
-                            conflicts.append(
-                                {
-                                    "mod_name": mod.name,
-                                    "conflicts_with": conflict_mod.name,
-                                    "reason": "Marked as incompatible on Modrinth",
-                                }
-                            )
-
+        conflicts = self._build_incompatible_conflicts(modrinth_mods, all_versions)
         self._conflict_cache[server_id] = (now, conflicts)
         return conflicts
 
@@ -195,46 +219,59 @@ class ModUpdater:
     # ── Install & Update ──────────────────────────────────────────
 
     async def install_mod(
-        self, server_id: int, project_id: str, source: str = "modrinth"
+        self,
+        server_id: int,
+        project_id: str,
+        source: str = "modrinth",
+        db: AsyncSession | None = None,
     ) -> Mod | None:
-        async with async_session() as session:
-            server = await session.get(Server, server_id)
-            if not server:
-                return None
-
-            if source == "modrinth":
-                # Resolve dependencies first
-                result = await session.execute(
-                    select(Mod).where(Mod.server_id == server_id)
+        if db is None:
+            async with async_session() as db:
+                return await self._install_mod_impl(
+                    server_id, project_id, source, db
                 )
-                installed_mods = result.scalars().all()
-                installed_ids = {m.project_id for m in installed_mods}
+        return await self._install_mod_impl(server_id, project_id, source, db)
 
-                if server.mc_version and server.loader:
-                    deps = await self._resolve_dependencies(
-                        project_id,
-                        server.mc_version,
-                        server.loader,
-                        installed_ids,
-                        set(),
-                    )
-                    # Install dependencies (skip the target mod itself, which is last)
-                    for dep in deps[:-1]:
-                        if dep["project_id"] not in installed_ids:
-                            dep_mod = await self._install_modrinth_mod(
-                                session,
-                                server,
-                                dep["project_id"],
-                                is_dependency=True,
-                            )
-                            if dep_mod:
-                                installed_ids.add(dep["project_id"])
-                                logger.info(f"Auto-installed dependency: {dep['name']}")
+    async def _install_mod_impl(
+        self, server_id: int, project_id: str, source: str, db: AsyncSession
+    ) -> Mod | None:
+        server = await db.get(Server, server_id)
+        if not server:
+            return None
 
-                return await self._install_modrinth_mod(session, server, project_id)
-            else:
-                logger.error(f"Unknown mod source: {source}")
-                return None
+        if source == "modrinth":
+            # Resolve dependencies first
+            result = await db.execute(
+                select(Mod).where(Mod.server_id == server_id)
+            )
+            installed_mods = result.scalars().all()
+            installed_ids = {m.project_id for m in installed_mods}
+
+            if server.mc_version and server.loader:
+                deps = await self._resolve_dependencies(
+                    project_id,
+                    server.mc_version,
+                    server.loader,
+                    installed_ids,
+                    set(),
+                )
+                # Install dependencies (skip the target mod itself, which is last)
+                for dep in deps[:-1]:
+                    if dep["project_id"] not in installed_ids:
+                        dep_mod = await self._install_modrinth_mod(
+                            db,
+                            server,
+                            dep["project_id"],
+                            is_dependency=True,
+                        )
+                        if dep_mod:
+                            installed_ids.add(dep["project_id"])
+                            logger.info(f"Auto-installed dependency: {dep['name']}")
+
+            return await self._install_modrinth_mod(db, server, project_id)
+        else:
+            logger.error(f"Unknown mod source: {source}")
+            return None
 
     async def _install_modrinth_mod(
         self,
@@ -300,22 +337,31 @@ class ModUpdater:
             await session.rollback()
             return None
 
-    async def check_updates(self, server_id: int | None = None):
-        async with async_session() as session:
-            query = select(Mod).where(Mod.auto_update.is_(True))
-            if server_id:
-                query = query.where(Mod.server_id == server_id)
+    async def check_updates(
+        self, server_id: int | None = None, db: AsyncSession | None = None
+    ):
+        if db is None:
+            async with async_session() as db:
+                return await self._check_updates_impl(server_id, db)
+        return await self._check_updates_impl(server_id, db)
 
-            result = await session.execute(query)
-            mods = result.scalars().all()
+    async def _check_updates_impl(
+        self, server_id: int | None, db: AsyncSession
+    ):
+        query = select(Mod).where(Mod.auto_update.is_(True))
+        if server_id:
+            query = query.where(Mod.server_id == server_id)
 
-            for mod in mods:
-                try:
-                    await self._check_mod_update(session, mod)
-                except Exception as e:
-                    logger.error(f"Error checking update for mod {mod.name}: {e}")
+        result = await db.execute(query)
+        mods = result.scalars().all()
 
-            await session.commit()
+        for mod in mods:
+            try:
+                await self._check_mod_update(db, mod)
+            except Exception as e:
+                logger.error(f"Error checking update for mod {mod.name}: {e}")
+
+        await db.commit()
 
     async def resolve_imported_mods(self, server_id: int) -> dict:
         """Resolve mods with project_id='imported' by looking up their SHA512 hash
@@ -451,26 +497,33 @@ class ModUpdater:
                 f"Update available for {mod.name}: {mod.installed_version} -> {latest['version_number']}"
             )
 
-    async def update_mod(self, mod_id: int) -> bool:
-        async with async_session() as session:
-            mod = await session.get(Mod, mod_id)
-            if not mod or not mod.update_available:
-                return False
+    async def update_mod(
+        self, mod_id: int, db: AsyncSession | None = None
+    ) -> bool:
+        if db is None:
+            async with async_session() as db:
+                return await self._update_mod_impl(mod_id, db)
+        return await self._update_mod_impl(mod_id, db)
 
-            server = await session.get(Server, mod.server_id)
-            if not server:
-                return False
+    async def _update_mod_impl(self, mod_id: int, db: AsyncSession) -> bool:
+        mod = await db.get(Mod, mod_id)
+        if not mod or not mod.update_available:
+            return False
 
-            try:
-                if mod.source == "modrinth":
-                    return await self._update_modrinth_mod(session, mod, server)
-                else:
-                    logger.error(f"Unknown mod source for update: {mod.source}")
-                    return False
-            except Exception as e:
-                logger.error(f"Failed to update mod {mod.name}: {e}")
-                await session.rollback()
+        server = await db.get(Server, mod.server_id)
+        if not server:
+            return False
+
+        try:
+            if mod.source == "modrinth":
+                return await self._update_modrinth_mod(db, mod, server)
+            else:
+                logger.error(f"Unknown mod source for update: {mod.source}")
                 return False
+        except Exception as e:
+            logger.error(f"Failed to update mod {mod.name}: {e}")
+            await db.rollback()
+            return False
 
     async def _update_modrinth_mod(
         self, session: AsyncSession, mod: Mod, server: Server
@@ -539,22 +592,29 @@ class ModUpdater:
 
         return results
 
-    async def remove_mod(self, mod_id: int) -> bool:
-        async with async_session() as session:
-            mod = await session.get(Mod, mod_id)
-            if not mod:
-                return False
+    async def remove_mod(
+        self, mod_id: int, db: AsyncSession | None = None
+    ) -> bool:
+        if db is None:
+            async with async_session() as db:
+                return await self._remove_mod_impl(mod_id, db)
+        return await self._remove_mod_impl(mod_id, db)
 
-            server = await session.get(Server, mod.server_id)
-            if server and mod.file_name:
-                file_path = Path(server.path) / "mods" / mod.file_name
-                if file_path.exists():
-                    file_path.unlink()
+    async def _remove_mod_impl(self, mod_id: int, db: AsyncSession) -> bool:
+        mod = await db.get(Mod, mod_id)
+        if not mod:
+            return False
 
-            await session.delete(mod)
-            await session.commit()
-            self._conflict_cache.pop(mod.server_id, None)
-            return True
+        server = await db.get(Server, mod.server_id)
+        if server and mod.file_name:
+            file_path = Path(server.path) / "mods" / mod.file_name
+            if file_path.exists():
+                file_path.unlink()
+
+        await db.delete(mod)
+        await db.commit()
+        self._conflict_cache.pop(mod.server_id, None)
+        return True
 
     async def _download_file(
         self,

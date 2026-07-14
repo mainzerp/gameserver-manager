@@ -1,7 +1,10 @@
+import socket
 import unittest
+from unittest.mock import patch
 
 from app.utils.security import (
     _PRIVATE_NETWORKS,
+    _resolved_hostname_is_private,
     is_internal_url,
     validate_webhook_url,
 )
@@ -49,6 +52,33 @@ class IsInternalUrlTests(unittest.TestCase):
 
     def test_empty_url_returns_true(self):
         self.assertTrue(is_internal_url(""))
+
+
+class ResolvedHostnameTests(unittest.TestCase):
+    def test_resolved_private_address(self):
+        with patch(
+            "socket.getaddrinfo",
+            return_value=[
+                (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("127.0.0.1", 0)),
+            ],
+        ):
+            self.assertTrue(_resolved_hostname_is_private("example.com"))
+
+    def test_resolved_public_address(self):
+        with patch(
+            "socket.getaddrinfo",
+            return_value=[
+                (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0)),
+            ],
+        ):
+            self.assertFalse(_resolved_hostname_is_private("example.com"))
+
+    def test_resolution_failure(self):
+        with patch(
+            "socket.getaddrinfo",
+            side_effect=socket.gaierror,
+        ):
+            self.assertFalse(_resolved_hostname_is_private("example.com"))
 
 
 class ValidateWebhookUrlTests(unittest.TestCase):

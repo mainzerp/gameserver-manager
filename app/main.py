@@ -41,6 +41,7 @@ from app.services.resource_monitor import resource_monitor
 from app.services.server_manager import server_manager
 from app.services.server_updater import server_updater
 from app.services.sftp_server import sftp_manager
+from app.services.task_registry import task_registry
 from app.services.task_scheduler import task_scheduler
 from app.services.update_checker import update_checker
 
@@ -51,16 +52,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    logger.info("Starting GameServer Manager...")
+_INSECURE_SECRET_KEYS = {
+    "change-me-in-production",
+    "replace-with-a-strong-random-secret-key-here",
+}
 
-    _INSECURE_SECRET_KEYS = {
-        "change-me-in-production",
-        "replace-with-a-strong-random-secret-key-here",
-    }
+_INSECURE_ENCRYPTION_KEYS = {"change-me-in-production", ""}
 
+
+async def _ensure_secret_key() -> None:
     if settings.secret_key in _INSECURE_SECRET_KEYS:
         logger.critical(
             "SECURITY: Using default/placeholder secret key. "
@@ -70,31 +70,32 @@ async def lifespan(app: FastAPI):
         raise SystemExit(
             "Refusing to start with default secret key. Set GSM_SECRET_KEY."
         )
+    if settings.encryption_key in _INSECURE_ENCRYPTION_KEYS:
+        logger.warning(
+            "SECURITY: encryption_key is not set or uses a placeholder. "
+            "Set GSM_ENCRYPTION_KEY environment variable to a value separate from GSM_SECRET_KEY."
+        )
 
-    await init_db()
 
-    async with async_session() as session:
-        await settings_service.load_from_db(session)
-
-    # Auto-install SteamCMD if configured and not available
+async def _init_steamcmd() -> None:
     from app.services.steamcmd import steamcmd
 
-    if settings.steamcmd_auto_install:
-        if not steamcmd.is_available:
-            logger.info("SteamCMD not found, attempting auto-install...")
-            available = await steamcmd.ensure_available()
-            if available:
-                logger.info("SteamCMD auto-installed successfully")
-            else:
-                logger.warning(
-                    "SteamCMD auto-install failed; Steam servers will not be available"
-                )
+    if not settings.steamcmd_auto_install:
+        return
+    if not steamcmd.is_available:
+        logger.info("SteamCMD not found, attempting auto-install...")
+        available = await steamcmd.ensure_available()
+        if available:
+            logger.info("SteamCMD auto-installed successfully")
         else:
-            logger.info("SteamCMD detected")
+            logger.warning(
+                "SteamCMD auto-install failed; Steam servers will not be available"
+            )
+    else:
+        logger.info("SteamCMD detected")
 
-    await server_manager.recover_on_startup()
 
-    # Auto-start servers
+async def _auto_start_servers() -> None:
     async with async_session() as session:
         result = await session.execute(
             select(Server).where(
@@ -110,15 +111,23 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"Failed to auto-start server {s.name}: {res['error']}")
             await asyncio.sleep(2)
 
-    # Schedule periodic mod update checks
+
+async def _register_local_node() -> None:
+    if not settings.multi_node_enabled:
+        return
+    async with async_session() as session:
+        await node_manager.register_local_node(session)
+
+
+def _build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
+
     scheduler.add_job(
         mod_updater.check_updates,
         "interval",
         minutes=settings.mod_check_interval_minutes,
         id="mod_update_check",
     )
-    scheduler.start()
     logger.info(
         f"Mod update checker scheduled every {settings.mod_check_interval_minutes} minutes"
     )
@@ -155,16 +164,10 @@ async def lifespan(app: FastAPI):
             hours=settings.update_check_interval_hours,
             id="update_check",
         )
-        asyncio.create_task(update_checker.check_for_updates())
         logger.info(
             f"Update checker scheduled every {settings.update_check_interval_hours} hours"
         )
 
-    app.state.scheduler = scheduler
-    task_scheduler.set_scheduler(scheduler)
-    await task_scheduler.load_tasks()
-
-    # Server update check job
     scheduler.add_job(
         server_updater.check_all_servers,
         "interval",
@@ -173,10 +176,7 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Server update checker scheduled every 6 hours")
 
-    # Node health check job
     if settings.multi_node_enabled:
-        async with async_session() as session:
-            await node_manager.register_local_node(session)
         scheduler.add_job(
             node_manager.check_all_nodes,
             "interval",
@@ -185,7 +185,6 @@ async def lifespan(app: FastAPI):
         )
         logger.info("Node health checker scheduled every 1 minute")
 
-    # Max compatible MC version daily check
     scheduler.add_job(
         mod_updater.update_all_max_compatible_versions,
         "interval",
@@ -194,8 +193,40 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Max compatible version check scheduled every 24 hours")
 
-    # Start optional services
+    return scheduler
+
+
+async def _start_optional_services() -> None:
     await sftp_manager.start()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting GameServer Manager...")
+
+    await _ensure_secret_key()
+    await init_db()
+
+    async with async_session() as session:
+        await settings_service.load_from_db(session)
+
+    await _init_steamcmd()
+    await server_manager.recover_on_startup()
+    await _auto_start_servers()
+
+    scheduler = _build_scheduler()
+    scheduler.start()
+
+    if settings.update_check_enabled and settings.update_repo:
+        task_registry.spawn(update_checker.check_for_updates())
+
+    app.state.scheduler = scheduler
+    task_scheduler.set_scheduler(scheduler)
+    await task_scheduler.load_tasks()
+
+    await _register_local_node()
+    await _start_optional_services()
 
     yield
 
@@ -205,6 +236,7 @@ async def lifespan(app: FastAPI):
     if settings.docker_isolation_enabled:
         await docker_manager.close()
     await server_manager.stop_all_servers()
+    await task_registry.flush()
     logger.info("All servers stopped gracefully")
     scheduler.shutdown()
     await mod_updater.close()

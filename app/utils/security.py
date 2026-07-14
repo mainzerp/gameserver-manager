@@ -23,6 +23,30 @@ _PRIVATE_NETWORKS = [
 _BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal"}
 
 
+def _ip_is_private(ip_str: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+    for network in _PRIVATE_NETWORKS:
+        if ip in network:
+            return True
+    return False
+
+
+def _resolved_hostname_is_private(hostname: str) -> bool:
+    """Resolve a hostname and return True if any address is private."""
+    try:
+        addr_infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+    for addr_info in addr_infos:
+        ip_str = addr_info[4][0]
+        if _ip_is_private(ip_str):
+            return True
+    return False
+
+
 def is_internal_url(url: str) -> bool:
     """Return True if the URL points to an internal/private address."""
     try:
@@ -32,30 +56,15 @@ def is_internal_url(url: str) -> bool:
             return True
         if hostname.lower() in _BLOCKED_HOSTNAMES:
             return True
-        try:
-            ip = ipaddress.ip_address(hostname)
-            for network in _PRIVATE_NETWORKS:
-                if ip in network:
-                    return True
-        except ValueError:
-            # Hostname is not a literal IP — resolve via DNS and check
-            # every returned address to block DNS-rebinding attacks.
-            try:
-                addr_infos = socket.getaddrinfo(hostname, None)
-                for addr_info in addr_infos:
-                    ip_str = addr_info[4][0]
-                    try:
-                        resolved_ip = ipaddress.ip_address(ip_str)
-                    except ValueError:
-                        continue
-                    for network in _PRIVATE_NETWORKS:
-                        if resolved_ip in network:
-                            return True
-            except socket.gaierror:
-                pass
+        if _ip_is_private(hostname):
+            return True
+        # Hostname is not a literal IP; resolve via DNS and check addresses
+        # to block DNS-rebinding attacks.
+        if _resolved_hostname_is_private(hostname):
+            return True
         return False
-    except Exception as exc:
-        logger.debug("SSRF check failed for URL %r: %s", url, exc)
+    except Exception:
+        logger.exception("SSRF check failed for URL %r", url)
         return True
 
 

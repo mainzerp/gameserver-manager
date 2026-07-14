@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     resource_cache_ttl: int = 3
     log_max_size_mb: int = 5
     log_max_files: int = 5
+    file_search_max_results: int = 100
+    file_search_max_depth: int = 10
+    file_search_max_file_size: int = 1 * 1024 * 1024
+    max_log_buffer_lines: int = 500
+    max_upload_size_mb: int = 50
+    max_extract_size_gb: int = 20
+    max_extract_files: int = 10000
     backup_dir: str = str(Path(__file__).resolve().parent.parent / "data" / "backups")
     max_backups_per_server: int = 10
     discord_webhook_url: str = ""
@@ -61,6 +68,9 @@ class Settings(BaseSettings):
     smtp_from_address: str = ""
     smtp_to_addresses: str = ""
     smtp_notify_events: str = "crash,backup_failed"
+    smtp_events: list[str] = ["crash", "backup_failed", "start", "stop"]
+    discord_events: list[str] = ["start", "stop", "crash", "backup"]
+    telegram_events: list[str] = ["start", "stop", "crash", "backup", "high_cpu", "high_memory"]
     webauthn_enabled: bool = False
     webauthn_rp_id: str = "localhost"
     webauthn_origin: str = "https://localhost:8443"

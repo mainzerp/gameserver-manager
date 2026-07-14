@@ -39,34 +39,37 @@ class PortManager:
         defaults = self.DEFAULT_RANGES.get(server_type, {"game": 25565, "rcon": 25575, "query": 0})
         used = await self.get_used_ports(db)
 
-        game_port = defaults["game"]
-        while game_port in used:
-            game_port += 1
-            if game_port > 65535:
-                break
+        game_port = self._next_free_port(defaults["game"], used, set())
 
-        rcon_port = defaults["rcon"]
-        if rcon_port > 0:
-            while rcon_port in used or rcon_port == game_port:
-                rcon_port += 1
-                if rcon_port > 65535:
-                    break
+        rcon_port = 0
+        if defaults["rcon"] > 0:
+            rcon_port = self._next_free_port(
+                defaults["rcon"], used, {game_port}
+            )
 
-        query_port = defaults["query"]
-        if query_port > 0:
-            while query_port in used or query_port == game_port or query_port == rcon_port:
-                query_port += 1
-                if query_port > 65535:
-                    break
+        query_port = 0
+        if defaults["query"] > 0:
+            query_port = self._next_free_port(
+                defaults["query"], used, {game_port, rcon_port}
+            )
         elif server_type == "steam":
             # Default Steam query port is game port + 1 if no specific default is defined.
-            query_port = game_port + 1
-            while query_port in used or query_port == rcon_port:
-                query_port += 1
-                if query_port > 65535:
-                    break
+            query_port = self._next_free_port(
+                game_port + 1, used, {rcon_port}
+            )
 
         return {"game_port": game_port, "rcon_port": rcon_port, "query_port": query_port}
+
+    def _next_free_port(
+        self, start: int, used: set[int], exclude: set[int]
+    ) -> int:
+        """Return the first port >= *start* not in *used* or *exclude*."""
+        port = start
+        while port in used or port in exclude:
+            port += 1
+            if port > 65535:
+                break
+        return port
 
     async def check_conflicts(
         self,

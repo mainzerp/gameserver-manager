@@ -11,12 +11,14 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import async_session
 from app.models.server import Server, ServerStatus, ServerType
 from app.services.log_manager import log_manager
 from app.services.notification_service import notification_service
+from app.services.task_registry import task_registry
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ class ServerProcess:
         self.server_id = server_id
         self.process = process
         self.log_lines: list[str] = []
-        self.max_log_lines = 500
+        self.max_log_lines = settings.max_log_buffer_lines
         self.subscribers: list[Callable] = []
         self._read_task: asyncio.Task | None = None
         self.server_name: str | None = None
@@ -169,194 +171,132 @@ class ServerManager:
                 pass
 
     async def start_server(
-        self, server_id: int, skip_steam_update: bool = False
+        self,
+        server_id: int,
+        skip_steam_update: bool = False,
+        db: AsyncSession | None = None,
     ) -> dict:
         """Start a server. Returns {ok: bool, error: str|None}."""
+        if db is None:
+            async with async_session() as db:
+                return await self._start_server_impl(server_id, skip_steam_update, db)
+        return await self._start_server_impl(server_id, skip_steam_update, db)
+
+    async def _start_server_impl(
+        self, server_id: int, skip_steam_update: bool, db: AsyncSession
+    ) -> dict:
+        """Start a server implementation using the provided session."""
         async with self._start_locks[server_id]:
             if server_id in self._processes:
                 return {"ok": False, "error": "Server is already running"}
 
-            async with async_session() as session:
-                server = await session.get(Server, server_id)
-                if not server:
-                    return {"ok": False, "error": "Server not found"}
+            server = await db.get(Server, server_id)
+            if not server:
+                return {"ok": False, "error": "Server not found"}
 
-                from app.config import settings as _settings
+            if server.node_id and settings.multi_node_enabled:
+                from app.models.node import Node
+                from app.services.node_manager import node_manager
 
-                if server.node_id and _settings.multi_node_enabled:
-                    from app.models.node import Node
-                    from app.services.node_manager import node_manager
-
-                    node = await session.get(Node, server.node_id)
-                    if node and not node.is_local:
-                        return await node_manager.proxy_command(
-                            node, f"servers/{server_id}/start"
-                        )
-
-                # Pre-flight checks for Minecraft Java
-                if server.server_type == ServerType.MINECRAFT_JAVA:
-                    jar_path = os.path.join(server.path, server.executable)
-                    if not os.path.isfile(jar_path):
-                        return {
-                            "ok": False,
-                            "error": f"server.jar not found: {jar_path}. "
-                            f"Please place the JAR file there or specify an MC version when creating the server.",
-                        }
-                    # Check if Java is available and correct version
-                    from app.services.java_manager import (
-                        detect_java_version,
-                        get_required_java_version,
+                node = await db.get(Node, server.node_id)
+                if node and not node.is_local:
+                    return await node_manager.proxy_command(
+                        node, f"servers/{server_id}/start"
                     )
 
-                    try:
-                        detected = await detect_java_version(server.java_path)
-                        if detected is None:
-                            return {
-                                "ok": False,
-                                "error": f"Java not available at '{server.java_path}'. "
-                                f"Please install Java or adjust the path.",
-                            }
-                        if server.mc_version:
-                            required = get_required_java_version(server.mc_version)
-                            if detected < required:
-                                return {
-                                    "ok": False,
-                                    "error": f"Java {detected} found, but MC {server.mc_version} "
-                                    f"requires Java {required}+. "
-                                    f"Please install Java {required} or adjust the path.",
-                                }
-                        logger.info(
-                            f"Java check OK: version {detected} at '{server.java_path}'"
-                        )
-                    except FileNotFoundError:
-                        return {
-                            "ok": False,
-                            "error": f"Java not found: '{server.java_path}'. "
-                            f"Please install the appropriate Java version.",
-                        }
-
-                # Pre-flight: Steam update-on-start
-                if (
-                    not skip_steam_update
-                    and server.server_type == ServerType.STEAM
-                    and server.steam_update_on_start
-                    and server.steam_app_id
-                ):
-                    from app.services.steamcmd import steamcmd
-
-                    if steamcmd.is_available:
-                        logger.info(
-                            f"Running SteamCMD update before starting {server.name}..."
-                        )
-                        (
-                            steam_kwargs,
-                            steam_error,
-                        ) = await steamcmd.get_server_install_kwargs(
-                            session, server, interactive=False
-                        )
-                        if steam_error:
-                            return {"ok": False, "error": steam_error}
-                        result = await steamcmd.update_server(
-                            app_id=server.steam_app_id,
-                            install_dir=server.path,
-                            **steam_kwargs,
-                        )
-                        if not result["ok"]:
-                            return {"ok": False, "error": result["message"]}
-                        if result["ok"] and result.get("build_id"):
-                            server.steam_build_id = result["build_id"]
-                            server.steam_last_update = datetime.now(timezone.utc)
-                            await session.commit()
-
-                server.status = ServerStatus.STARTING
-                await session.commit()
+            # Pre-flight checks for Minecraft Java
+            if server.server_type == ServerType.MINECRAFT_JAVA:
+                jar_path = os.path.join(server.path, server.executable)
+                if not os.path.isfile(jar_path):
+                    return {
+                        "ok": False,
+                        "error": f"server.jar not found: {jar_path}. "
+                        f"Please place the JAR file there or specify an MC version when creating the server.",
+                    }
+                # Check if Java is available and correct version
+                from app.services.java_manager import (
+                    detect_java_version,
+                    get_required_java_version,
+                )
 
                 try:
-                    if _docker_enabled():
-                        from app.services.docker_manager import docker_manager
-
-                        container_id = await docker_manager.create_and_start(server)
-                        server.container_id = container_id
-                        await session.commit()
-                        self._docker_processes[server_id] = container_id
-                        self._readiness_generations[server_id] = (
-                            self._readiness_generations.get(server_id, 0) + 1
-                        )
-                        asyncio.create_task(
-                            self._watch_container(server_id, container_id)
-                        )
-                        asyncio.create_task(
-                            self._watch_readiness(
-                                server_id,
-                                server.ready_log_pattern,
-                                server.crash_stability_window,
-                                self._readiness_generations[server_id],
-                            )
-                        )
-                        asyncio.create_task(
-                            notification_service.notify(
-                                "start",
-                                f"Server Started: {server.name}",
-                                f"Port: {server.port} (Docker)",
-                                color=0x22C55E,
-                                server_id=server_id,
-                            )
-                        )
-                        return {"ok": True, "error": None}
-
-                    cmd = self._build_command(server)
-                    logger.info(f"Starting server {server.name}: {cmd}")
-
-                    # Pre-flight: verify the server executable exists before launching
-                    if server.executable and not os.path.isabs(server.executable):
-                        exe_path = os.path.join(server.path, server.executable)
-                        if not os.path.exists(exe_path):
+                    detected = await detect_java_version(server.java_path)
+                    if detected is None:
+                        return {
+                            "ok": False,
+                            "error": f"Java not available at '{server.java_path}'. "
+                            f"Please install Java or adjust the path.",
+                        }
+                    if server.mc_version:
+                        required = get_required_java_version(server.mc_version)
+                        if detected < required:
                             return {
                                 "ok": False,
-                                "error": (
-                                    f"Server executable not found: {exe_path}. "
-                                    "Please wait for the installation to complete."
-                                ),
+                                "error": f"Java {detected} found, but MC {server.mc_version} "
+                                f"requires Java {required}+. "
+                                f"Please install Java {required} or adjust the path.",
                             }
-
-                    env = os.environ.copy()
-                    if server.environment_vars:
-                        import json
-
-                        try:
-                            custom_env = json.loads(server.environment_vars)
-                            if isinstance(custom_env, dict):
-                                env.update(
-                                    {str(k): str(v) for k, v in custom_env.items()}
-                                )
-                        except (json.JSONDecodeError, TypeError):
-                            pass
-
-                    process = await asyncio.create_subprocess_exec(
-                        *cmd,
-                        stdin=asyncio.subprocess.PIPE,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.STDOUT,
-                        cwd=server.path,
-                        env=env,
-                        start_new_session=True,
+                    logger.info(
+                        f"Java check OK: version {detected} at '{server.java_path}'"
                     )
+                except FileNotFoundError:
+                    return {
+                        "ok": False,
+                        "error": f"Java not found: '{server.java_path}'. "
+                        f"Please install the appropriate Java version.",
+                    }
 
-                    sp = ServerProcess(server_id, process)
-                    sp.server_name = server.name
-                    self._processes[server_id] = sp
-                    await sp.start_reading()
+            # Pre-flight: Steam update-on-start
+            if (
+                not skip_steam_update
+                and server.server_type == ServerType.STEAM
+                and server.steam_update_on_start
+                and server.steam_app_id
+            ):
+                from app.services.steamcmd import steamcmd
 
-                    self._write_pid_file(server.path, process.pid)
+                if steamcmd.is_available:
+                    logger.info(
+                        f"Running SteamCMD update before starting {server.name}..."
+                    )
+                    (
+                        steam_kwargs,
+                        steam_error,
+                    ) = await steamcmd.get_server_install_kwargs(
+                        db, server, interactive=False
+                    )
+                    if steam_error:
+                        return {"ok": False, "error": steam_error}
+                    result = await steamcmd.update_server(
+                        app_id=server.steam_app_id,
+                        install_dir=server.path,
+                        **steam_kwargs,
+                    )
+                    if not result["ok"]:
+                        return {"ok": False, "error": result["message"]}
+                    if result["ok"] and result.get("build_id"):
+                        server.steam_build_id = result["build_id"]
+                        server.steam_last_update = datetime.now(timezone.utc)
+                        await db.commit()
 
-                    server.started_at = datetime.now(timezone.utc)
-                    await session.commit()
+            server.status = ServerStatus.STARTING
+            await db.commit()
 
+            try:
+                if _docker_enabled():
+                    from app.services.docker_manager import docker_manager
+
+                    container_id = await docker_manager.create_and_start(server)
+                    server.container_id = container_id
+                    await db.commit()
+                    self._docker_processes[server_id] = container_id
                     self._readiness_generations[server_id] = (
                         self._readiness_generations.get(server_id, 0) + 1
                     )
-                    asyncio.create_task(self._watch_process(server_id, process))
-                    asyncio.create_task(
+                    task_registry.spawn(
+                        self._watch_container(server_id, container_id)
+                    )
+                    task_registry.spawn(
                         self._watch_readiness(
                             server_id,
                             server.ready_log_pattern,
@@ -364,42 +304,131 @@ class ServerManager:
                             self._readiness_generations[server_id],
                         )
                     )
-                    asyncio.create_task(
+                    task_registry.spawn(
                         notification_service.notify(
                             "start",
                             f"Server Started: {server.name}",
-                            f"Port: {server.port}",
+                            f"Port: {server.port} (Docker)",
                             color=0x22C55E,
                             server_id=server_id,
                         )
                     )
                     return {"ok": True, "error": None}
 
-                except Exception as e:
-                    logger.error(f"Failed to start server {server_id}: {e}")
-                    server.status = ServerStatus.CRASHED
-                    await session.commit()
-                    return {"ok": False, "error": str(e)}
+                cmd = self._build_command(server)
+                logger.info(f"Starting server {server.name}: {cmd}")
 
-    async def stop_server(self, server_id: int) -> bool:
-        async with async_session() as session:
-            server = await session.get(Server, server_id)
-            if server:
-                from app.config import settings as _settings
+                # Pre-flight: verify the server executable exists before launching
+                if server.executable and not os.path.isabs(server.executable):
+                    exe_path = os.path.join(server.path, server.executable)
+                    if not os.path.exists(exe_path):
+                        return {
+                            "ok": False,
+                            "error": (
+                                f"Server executable not found: {exe_path}. "
+                                "Please wait for the installation to complete."
+                            ),
+                        }
 
-                if server.node_id and _settings.multi_node_enabled:
-                    from app.models.node import Node
-                    from app.services.node_manager import node_manager
+                env = os.environ.copy()
+                if server.environment_vars:
+                    import json
 
-                    node = await session.get(Node, server.node_id)
-                    if node and not node.is_local:
-                        result = await node_manager.proxy_command(
-                            node, f"servers/{server_id}/stop"
-                        )
-                        return result.get("ok", False)
+                    try:
+                        custom_env = json.loads(server.environment_vars)
+                        if isinstance(custom_env, dict):
+                            env.update(
+                                {str(k): str(v) for k, v in custom_env.items()}
+                            )
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    cwd=server.path,
+                    env=env,
+                    start_new_session=True,
+                )
+
+                sp = ServerProcess(server_id, process)
+                sp.server_name = server.name
+                self._processes[server_id] = sp
+                await sp.start_reading()
+
+                self._write_pid_file(server.path, process.pid)
+
+                server.started_at = datetime.now(timezone.utc)
+                await db.commit()
+
+                self._readiness_generations[server_id] = (
+                    self._readiness_generations.get(server_id, 0) + 1
+                )
+                task_registry.spawn(self._watch_process(server_id, process))
+                task_registry.spawn(
+                    self._watch_readiness(
+                        server_id,
+                        server.ready_log_pattern,
+                        server.crash_stability_window,
+                        self._readiness_generations[server_id],
+                    )
+                )
+                task_registry.spawn(
+                    notification_service.notify(
+                        "start",
+                        f"Server Started: {server.name}",
+                        f"Port: {server.port}",
+                        color=0x22C55E,
+                        server_id=server_id,
+                    )
+                )
+                return {"ok": True, "error": None}
+
+            except asyncio.CancelledError:
+                raise
+            except (OSError, FileNotFoundError) as e:
+                logger.error(
+                    f"Failed to start server {server_id}: {e}", exc_info=True
+                )
+                server.status = ServerStatus.CRASHED
+                await db.commit()
+                return {"ok": False, "error": str(e)}
+            except Exception as e:
+                logger.exception(f"Unexpected failure starting server {server_id}")
+                server.status = ServerStatus.CRASHED
+                await db.commit()
+                return {"ok": False, "error": str(e)}
+
+    async def stop_server(
+        self, server_id: int, db: AsyncSession | None = None
+    ) -> bool:
+        """Stop a server."""
+        if db is None:
+            async with async_session() as db:
+                return await self._stop_server_impl(server_id, db)
+        return await self._stop_server_impl(server_id, db)
+
+    async def _stop_server_impl(
+        self, server_id: int, db: AsyncSession
+    ) -> bool:
+        """Stop a server implementation using the provided session."""
+        server = await db.get(Server, server_id)
+        if server:
+            if server.node_id and settings.multi_node_enabled:
+                from app.models.node import Node
+                from app.services.node_manager import node_manager
+
+                node = await db.get(Node, server.node_id)
+                if node and not node.is_local:
+                    result = await node_manager.proxy_command(
+                        node, f"servers/{server_id}/stop"
+                    )
+                    return result.get("ok", False)
 
         if _docker_enabled():
-            return await self._stop_docker_server(server_id)
+            return await self._stop_docker_server(server_id, db)
 
         self._reset_crash_state(server_id)
 
@@ -407,20 +436,18 @@ class ServerManager:
         if not sp:
             return False
 
-        async with async_session() as session:
-            server = await session.get(Server, server_id)
-            if server:
-                server.status = ServerStatus.STOPPING
-                await session.commit()
+        server = await db.get(Server, server_id)
+        if server:
+            server.status = ServerStatus.STOPPING
+            await db.commit()
 
         try:
             server_type_val = ""
             server_path = ""
-            async with async_session() as session:
-                server = await session.get(Server, server_id)
-                if server:
-                    server_type_val = server.server_type.value
-                    server_path = server.path
+            server = await db.get(Server, server_id)
+            if server:
+                server_type_val = server.server_type.value
+                server_path = server.path
 
             if server_type_val.startswith("minecraft"):
                 await sp.send_command("stop")
@@ -454,114 +481,129 @@ class ServerManager:
         if server_path:
             self._remove_pid_file(server_path)
 
-        async with async_session() as session:
-            server = await session.get(Server, server_id)
-            if server:
-                server.status = ServerStatus.STOPPED
-                server.started_at = None
-                await session.commit()
-                asyncio.create_task(
-                    notification_service.notify(
-                        "stop",
-                        f"Server Stopped: {server.name}",
-                        "",
-                        color=0xEF4444,
-                        server_id=server_id,
-                    )
+        server = await db.get(Server, server_id)
+        if server:
+            server.status = ServerStatus.STOPPED
+            server.started_at = None
+            await db.commit()
+            task_registry.spawn(
+                notification_service.notify(
+                    "stop",
+                    f"Server Stopped: {server.name}",
+                    "",
+                    color=0xEF4444,
+                    server_id=server_id,
                 )
+            )
 
         return True
 
-    async def restart_server(self, server_id: int) -> bool:
-        await self.stop_server(server_id)
+    async def restart_server(
+        self, server_id: int, db: AsyncSession | None = None
+    ) -> bool:
+        await self.stop_server(server_id, db=db)
         await asyncio.sleep(2)
-        return await self.start_server(server_id)
+        return await self.start_server(server_id, db=db)
 
-    async def send_command(self, server_id: int, command: str) -> bool:
-        async with async_session() as session:
-            server = await session.get(Server, server_id)
-            if server and server.node_id:
-                from app.config import settings as _settings
+    async def send_command(
+        self,
+        server_id: int,
+        command: str,
+        db: AsyncSession | None = None,
+    ) -> bool:
+        if db is None:
+            async with async_session() as db:
+                return await self._send_command_impl(server_id, command, db)
+        return await self._send_command_impl(server_id, command, db)
 
-                if _settings.multi_node_enabled:
-                    from app.models.node import Node
-                    from app.services.node_manager import node_manager
+    async def _send_command_impl(
+        self, server_id: int, command: str, db: AsyncSession
+    ) -> bool:
+        server = await db.get(Server, server_id)
+        if server and server.node_id:
+            if settings.multi_node_enabled:
+                from app.models.node import Node
+                from app.services.node_manager import node_manager
 
-                    node = await session.get(Node, server.node_id)
-                    if node and not node.is_local:
-                        result = await node_manager.proxy_command(
-                            node,
-                            f"servers/{server_id}/command",
-                            data={"command": command},
-                        )
-                        return result.get("ok", False)
-            if _docker_enabled() and server and server.container_id:
-                from app.services.docker_manager import docker_manager
+                node = await db.get(Node, server.node_id)
+                if node and not node.is_local:
+                    result = await node_manager.proxy_command(
+                        node,
+                        f"servers/{server_id}/command",
+                        data={"command": command},
+                    )
+                    return result.get("ok", False)
+        if _docker_enabled() and server and server.container_id:
+            from app.services.docker_manager import docker_manager
 
-                await docker_manager.send_command(server.container_id, command)
-                return True
-            if (
-                server
-                and server.server_type == ServerType.STEAM
-                and server.rcon_enabled
-                and server.rcon_port
-                and server.rcon_password
-            ):
-                from app.services.steam_rcon import steam_rcon_service
+            await docker_manager.send_command(server.container_id, command)
+            return True
+        if (
+            server
+            and server.server_type == ServerType.STEAM
+            and server.rcon_enabled
+            and server.rcon_port
+            and server.rcon_password
+        ):
+            from app.services.steam_rcon import steam_rcon_service
 
-                result = await steam_rcon_service.send_command(server, command)
-                return result.get("ok", False)
+            result = await steam_rcon_service.send_command(server, command)
+            return result.get("ok", False)
         sp = self._processes.get(server_id)
         if not sp:
             return False
         await sp.send_command(command)
         return True
 
-    def get_logs(self, server_id: int) -> list[str]:
+    def get_logs(
+        self, server_id: int, db: AsyncSession | None = None
+    ) -> list[str]:
         sp = self._processes.get(server_id)
         if not sp:
             return []
         return list(sp.log_lines)
 
-    def is_running(self, server_id: int) -> bool:
+    def is_running(
+        self, server_id: int, db: AsyncSession | None = None
+    ) -> bool:
         return server_id in self._processes or server_id in self._docker_processes
 
-    async def _stop_docker_server(self, server_id: int) -> bool:
+    async def _stop_docker_server(
+        self, server_id: int, db: AsyncSession
+    ) -> bool:
         """Stop a server running in Docker."""
         self._reset_crash_state(server_id)
         from app.services.docker_manager import docker_manager
 
-        async with async_session() as session:
-            server = await session.get(Server, server_id)
-            if not server or not server.container_id:
-                return False
-            container_id = server.container_id
-            server.status = ServerStatus.STOPPING
-            await session.commit()
+        server = await db.get(Server, server_id)
+        if not server or not server.container_id:
+            return False
+        container_id = server.container_id
+        server.status = ServerStatus.STOPPING
+        await db.commit()
 
         try:
             await docker_manager.stop(container_id)
             await docker_manager.remove(container_id)
-        except Exception as e:
-            logger.error(f"Error stopping Docker container for server {server_id}: {e}")
+        except Exception:
+            logger.exception(f"Error stopping Docker container for server {server_id}")
 
         self._docker_processes.pop(server_id, None)
 
-        async with async_session() as session:
-            server = await session.get(Server, server_id)
-            if server:
-                server.status = ServerStatus.STOPPED
-                server.container_id = None
-                await session.commit()
-                asyncio.create_task(
-                    notification_service.notify(
-                        "stop",
-                        f"Server Stopped: {server.name}",
-                        "",
-                        color=0xEF4444,
-                        server_id=server_id,
-                    )
+        server = await db.get(Server, server_id)
+        if server:
+            server.status = ServerStatus.STOPPED
+            server.container_id = None
+            await db.commit()
+            task_registry.spawn(
+                notification_service.notify(
+                    "stop",
+                    f"Server Stopped: {server.name}",
+                    "",
+                    color=0xEF4444,
+                    server_id=server_id,
                 )
+            )
         return True
 
     async def _watch_container(self, server_id: int, container_id: str):
@@ -591,7 +633,7 @@ class ServerManager:
                                 "Docker container exited",
                             )
                         else:
-                            asyncio.create_task(
+                            task_registry.spawn(
                                 notification_service.notify(
                                     "crash",
                                     f"Server Crashed: {server.name}",
@@ -630,7 +672,7 @@ class ServerManager:
                             f"Exit code: {process.returncode}",
                         )
                     else:
-                        asyncio.create_task(
+                        task_registry.spawn(
                             notification_service.notify(
                                 "crash",
                                 f"Server Crashed: {server.name}",
@@ -661,7 +703,7 @@ class ServerManager:
                 f"Server {server_name} crashed {state.count} times, "
                 f"exceeding max_crash_restarts={max_restarts}. Giving up."
             )
-            asyncio.create_task(
+            task_registry.spawn(
                 notification_service.notify(
                     "crash",
                     f"Server Crashed: {server_name} (auto-restart exhausted)",
@@ -677,7 +719,7 @@ class ServerManager:
             f"Server {server_name} crashed (attempt {state.count}/{max_restarts}). "
             f"Auto-restarting in {delay}s..."
         )
-        asyncio.create_task(
+        task_registry.spawn(
             notification_service.notify(
                 "crash",
                 f"Server Crashed: {server_name} (auto-restarting {state.count}/{max_restarts})",
@@ -723,7 +765,7 @@ class ServerManager:
             logger.error(
                 f"Crash auto-restart failed for {server_name}: {result['error']}"
             )
-            asyncio.create_task(
+            task_registry.spawn(
                 notification_service.notify(
                     "crash",
                     f"Auto-Restart Failed: {server_name}",
@@ -899,49 +941,58 @@ class ServerManager:
 
     def _build_command(self, server: Server) -> list[str]:
         if server.server_type == ServerType.MINECRAFT_BEDROCK:
-            binary = (
-                "bedrock_server.exe" if sys.platform == "win32" else "./bedrock_server"
-            )
-            exe_path = os.path.join(server.path, binary)
-            cmd = [exe_path]
-            if server.server_args:
-                for arg in server.server_args.strip().splitlines():
-                    arg = arg.strip()
-                    if arg:
-                        cmd.append(arg)
-            return cmd
+            return self._build_bedrock_command(server)
         if server.server_type.value.startswith("minecraft"):
-            java_path = server.java_path
-            # Auto-detect managed Java if using default "java" and MC version is set
-            if java_path == "java" and server.mc_version:
-                from app.services.java_manager import (
-                    get_managed_java_path,
-                    get_required_java_version,
-                )
+            return self._build_minecraft_java_command(server)
+        return self._build_steam_command(server)
 
-                required = get_required_java_version(server.mc_version)
-                managed = get_managed_java_path(required)
-                if managed:
-                    java_path = managed
-            cmd = [
-                java_path,
-                f"-Xms{server.min_memory}M",
-                f"-Xmx{server.max_memory}M",
-            ]
-            if server.jvm_flags:
-                for flag in server.jvm_flags.strip().splitlines():
-                    flag = flag.strip()
-                    if flag:
-                        cmd.append(flag)
-            cmd.extend(["-jar", server.executable])
-            if server.server_args:
-                for arg in server.server_args.strip().splitlines():
-                    arg = arg.strip()
-                    if arg:
-                        cmd.append(arg)
-            else:
-                cmd.append("nogui")
-            return cmd
+    def _build_bedrock_command(self, server: Server) -> list[str]:
+        binary = (
+            "bedrock_server.exe" if sys.platform == "win32" else "./bedrock_server"
+        )
+        exe_path = os.path.join(server.path, binary)
+        cmd = [exe_path]
+        if server.server_args:
+            for arg in server.server_args.strip().splitlines():
+                arg = arg.strip()
+                if arg:
+                    cmd.append(arg)
+        return cmd
+
+    def _build_minecraft_java_command(self, server: Server) -> list[str]:
+        java_path = server.java_path
+        # Auto-detect managed Java if using default "java" and MC version is set
+        if java_path == "java" and server.mc_version:
+            from app.services.java_manager import (
+                get_managed_java_path,
+                get_required_java_version,
+            )
+
+            required = get_required_java_version(server.mc_version)
+            managed = get_managed_java_path(required)
+            if managed:
+                java_path = managed
+        cmd = [
+            java_path,
+            f"-Xms{server.min_memory}M",
+            f"-Xmx{server.max_memory}M",
+        ]
+        if server.jvm_flags:
+            for flag in server.jvm_flags.strip().splitlines():
+                flag = flag.strip()
+                if flag:
+                    cmd.append(flag)
+        cmd.extend(["-jar", server.executable])
+        if server.server_args:
+            for arg in server.server_args.strip().splitlines():
+                arg = arg.strip()
+                if arg:
+                    cmd.append(arg)
+        else:
+            cmd.append("nogui")
+        return cmd
+
+    def _build_steam_command(self, server: Server) -> list[str]:
         from app.services.steamcmd import _validate_server_name, build_runtime_command
 
         _validate_server_name(server.name)

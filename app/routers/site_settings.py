@@ -5,19 +5,22 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.site_settings import SiteSettings
+from app.models.steam_account import (
+    SteamAccount,
+    encrypt_password,
+    encrypt_totp_secret,
+)
 from app.services import settings_service
 from app.services.auth import get_current_user_dep, require_role
+from app.services.steamcmd import steamcmd
 from app.template_utils import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", dependencies=[Depends(get_current_user_dep)])
-
-SMTP_EVENTS = ["crash", "backup_failed", "start", "stop"]
-DISCORD_EVENTS = ["start", "stop", "crash", "backup"]
-TELEGRAM_EVENTS = ["start", "stop", "crash", "backup", "high_cpu", "high_memory"]
 
 
 async def _get_row(db: AsyncSession) -> SiteSettings:
@@ -36,20 +39,16 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")
     row = await _get_row(db)
 
-    from app.models.steam_account import SteamAccount
-
     steam_accounts_result = await db.execute(
         select(SteamAccount).order_by(SteamAccount.display_name)
     )
     steam_accounts = steam_accounts_result.scalars().all()
 
-    from app.services.steamcmd import steamcmd
-
     return templates.TemplateResponse(request, "site_settings.html", {
             "s": row,
-            "smtp_events": SMTP_EVENTS,
-            "discord_events": DISCORD_EVENTS,
-            "telegram_events": TELEGRAM_EVENTS,
+            "smtp_events": settings.smtp_events,
+            "discord_events": settings.discord_events,
+            "telegram_events": settings.telegram_events,
             "has_smtp_password": bool(row.smtp_password_enc),
             "saved": request.query_params.get("saved") == "1",
             "steam_accounts": steam_accounts,
@@ -89,7 +88,7 @@ async def settings_save(request: Request, db: AsyncSession = Depends(get_db)):
         "smtp_use_tls": _bool("smtp_use_tls"),
         "smtp_from_address": (form.get("smtp_from_address") or "").strip(),
         "smtp_to_addresses": (form.get("smtp_to_addresses") or "").strip(),
-        "smtp_notify_events": ",".join(e for e in smtp_notify_list if e in SMTP_EVENTS)
+        "smtp_notify_events": ",".join(e for e in smtp_notify_list if e in settings.smtp_events)
         or "crash,backup_failed",
         "totp_global_enabled": _bool("totp_global_enabled"),
         "multi_node_enabled": _bool("multi_node_enabled"),
@@ -99,13 +98,13 @@ async def settings_save(request: Request, db: AsyncSession = Depends(get_db)):
         or "https://localhost:8443",
         "discord_webhook_url": (form.get("discord_webhook_url") or "").strip(),
         "discord_notify_events": ",".join(
-            e for e in discord_notify_list if e in DISCORD_EVENTS
+            e for e in discord_notify_list if e in settings.discord_events
         )
         or "start,stop,crash,backup",
         "telegram_bot_token": (form.get("telegram_bot_token") or "").strip(),
         "telegram_chat_id": (form.get("telegram_chat_id") or "").strip(),
         "telegram_notify_events": ",".join(
-            e for e in telegram_notify_list if e in TELEGRAM_EVENTS
+            e for e in telegram_notify_list if e in settings.telegram_events
         )
         or "crash",
         "backup_external_path": (form.get("backup_external_path") or "").strip(),
@@ -143,8 +142,12 @@ async def test_smtp(request: Request, db: AsyncSession = Depends(get_db)):
             if cfg.smtp_user and cfg.smtp_password:
                 await smtp.login(cfg.smtp_user, cfg.smtp_password)
         return JSONResponse({"ok": True})
-    except Exception as exc:
+    except aiosmtplib.SMTPException as exc:
+        logger.exception("SMTP test failed")
         return JSONResponse({"ok": False, "error": str(exc)})
+    except OSError as exc:
+        logger.exception("SMTP test failed (network error)")
+        return JSONResponse({"ok": False, "error": f"Network error: {exc}"})
 
 
 @router.post("/test-discord")
@@ -170,8 +173,12 @@ async def test_discord(request: Request, db: AsyncSession = Depends(get_db)):
         return JSONResponse(
             {"ok": False, "error": f"Discord returned HTTP {resp.status_code}"}
         )
-    except Exception as exc:
+    except httpx.HTTPError as exc:
+        logger.exception("Discord webhook test failed")
         return JSONResponse({"ok": False, "error": str(exc)})
+    except OSError as exc:
+        logger.exception("Discord webhook test failed (network error)")
+        return JSONResponse({"ok": False, "error": f"Network error: {exc}"})
 
 
 @router.post("/test-telegram")
@@ -200,15 +207,17 @@ async def test_telegram(request: Request, db: AsyncSession = Depends(get_db)):
         return JSONResponse(
             {"ok": False, "error": data.get("description", "Unknown error")}
         )
-    except Exception as exc:
+    except httpx.HTTPError as exc:
+        logger.exception("Telegram test failed")
         return JSONResponse({"ok": False, "error": str(exc)})
+    except OSError as exc:
+        logger.exception("Telegram test failed (network error)")
+        return JSONResponse({"ok": False, "error": f"Network error: {exc}"})
 
 
 @router.post("/steamcmd/install")
 async def install_steamcmd(request: Request, db: AsyncSession = Depends(get_db)):
     await require_role(request, "admin")
-    from app.services.steamcmd import steamcmd
-
     await steamcmd.ensure_available()
     return RedirectResponse(url="/settings/?saved=1", status_code=303)
 
@@ -228,12 +237,6 @@ async def add_steam_account(
 
     if not display_name or not username or not password:
         return RedirectResponse(url="/settings/", status_code=303)
-
-    from app.models.steam_account import (
-        SteamAccount,
-        encrypt_password,
-        encrypt_totp_secret,
-    )
 
     secret_encrypted = None
     if steam_guard_type == "totp" and steam_guard_secret:
@@ -258,8 +261,6 @@ async def delete_steam_account(
     db: AsyncSession = Depends(get_db),
 ):
     await require_role(request, "admin")
-    from app.models.steam_account import SteamAccount
-
     account = await db.get(SteamAccount, account_id)
     if account:
         await db.delete(account)

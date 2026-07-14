@@ -256,6 +256,63 @@ async def download_forge_jar(
             return False
 
 
+def _pick_neoforge_version(mc_version: str, versions: list[str]) -> str | None:
+    """Choose the latest NeoForge version matching the Minecraft version."""
+    mc_parts = mc_version.split(".")
+    if len(mc_parts) >= 2:
+        nf_prefix = f"{mc_parts[1]}."
+        if len(mc_parts) >= 3:
+            nf_prefix = f"{mc_parts[1]}.{mc_parts[2]}."
+    else:
+        nf_prefix = ""
+
+    matching = [v for v in versions if v.startswith(nf_prefix)]
+    if not matching:
+        matching = [v for v in versions if v.startswith(f"{mc_parts[1]}.")]
+    return matching[-1] if matching else None
+
+
+async def _install_neoforge_server(dest_dir: Path, installer_path: Path) -> bool:
+    """Run the NeoForge installer and rename the produced JAR to server.jar."""
+    logger.info("Running NeoForge installer...")
+    proc = await asyncio.create_subprocess_exec(
+        "java",
+        "-jar",
+        str(installer_path),
+        "--installServer",
+        cwd=str(dest_dir),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        await asyncio.wait_for(proc.communicate(), timeout=300)
+    except asyncio.TimeoutError:
+        proc.kill()
+        logger.error("NeoForge installer timed out")
+        return False
+
+    try:
+        installer_path.unlink()
+    except OSError:
+        pass
+
+    # Ensure a server.jar exists for NeoForge
+    for f in dest_dir.iterdir():
+        if f.name.endswith(".jar") and "installer" not in f.name:
+            server_jar = dest_dir / "server.jar"
+            if server_jar.exists():
+                server_jar.unlink()
+            f.rename(server_jar)
+            break
+    else:
+        logger.warning(
+            "NeoForge installer did not produce a server JAR. "
+            "The server may need to be started via the generated run script."
+        )
+
+    return True
+
+
 async def download_neoforge_jar(
     mc_version: str, dest_dir: Path, loader_version: str | None = None
 ) -> bool:
@@ -270,23 +327,10 @@ async def download_neoforge_jar(
                 )
                 resp.raise_for_status()
                 versions = resp.json().get("versions", [])
-
-                mc_parts = mc_version.split(".")
-                if len(mc_parts) >= 2:
-                    nf_prefix = f"{mc_parts[1]}."
-                    if len(mc_parts) >= 3:
-                        nf_prefix = f"{mc_parts[1]}.{mc_parts[2]}."
-                else:
-                    nf_prefix = ""
-
-                matching = [v for v in versions if v.startswith(nf_prefix)]
-                if not matching:
-                    matching = [v for v in versions if v.startswith(f"{mc_parts[1]}.")]
-                if not matching:
+                nf_version = _pick_neoforge_version(mc_version, versions)
+                if not nf_version:
                     logger.error(f"No NeoForge version found for MC {mc_version}")
                     return False
-
-                nf_version = matching[-1]
 
             installer_url = (
                 f"https://maven.neoforged.net/releases/net/neoforged/neoforge/"
@@ -298,41 +342,8 @@ async def download_neoforge_jar(
             if not await _download_file(client, installer_url, installer_path):
                 return False
 
-            logger.info("Running NeoForge installer...")
-            proc = await asyncio.create_subprocess_exec(
-                "java",
-                "-jar",
-                str(installer_path),
-                "--installServer",
-                cwd=str(dest_dir),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                await asyncio.wait_for(proc.communicate(), timeout=300)
-            except asyncio.TimeoutError:
-                proc.kill()
-                logger.error("NeoForge installer timed out")
+            if not await _install_neoforge_server(dest_dir, installer_path):
                 return False
-
-            try:
-                installer_path.unlink()
-            except OSError:
-                pass
-
-            # Ensure a server.jar exists for NeoForge
-            for f in dest_dir.iterdir():
-                if f.name.endswith(".jar") and "installer" not in f.name:
-                    server_jar = dest_dir / "server.jar"
-                    if server_jar.exists():
-                        server_jar.unlink()
-                    f.rename(server_jar)
-                    break
-            else:
-                logger.warning(
-                    "NeoForge installer did not produce a server JAR. "
-                    "The server may need to be started via the generated run script."
-                )
 
             logger.info(f"NeoForge installed for MC {mc_version}")
             return True
@@ -486,6 +497,49 @@ async def get_latest_paper_build(mc_version: str) -> int | None:
     return None
 
 
+async def _latest_loader_version(url: str) -> str | None:
+    """Return the latest loader version from a simple JSON list endpoint."""
+    async with await _get_client() as client:
+        try:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            loaders = resp.json()
+            return loaders[0]["version"] if loaders else None
+        except Exception:
+            return None
+
+
+async def _latest_forge_version(mc_version: str) -> str | None:
+    async with await _get_client() as client:
+        try:
+            resp = await client.get(
+                "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
+            )
+            resp.raise_for_status()
+            promos = resp.json().get("promos", {})
+            return promos.get(f"{mc_version}-recommended") or promos.get(
+                f"{mc_version}-latest"
+            )
+        except Exception:
+            return None
+
+
+async def _latest_neoforge_version(mc_version: str) -> str | None:
+    async with await _get_client() as client:
+        try:
+            resp = await client.get(
+                "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"
+            )
+            resp.raise_for_status()
+            versions = resp.json().get("versions", [])
+            mc_parts = mc_version.split(".")
+            prefix = f"{mc_parts[1]}." if len(mc_parts) >= 2 else ""
+            matching = [v for v in versions if v.startswith(prefix)]
+            return matching[-1] if matching else None
+        except Exception:
+            return None
+
+
 async def get_latest_version(
     loader: str | None, mc_version: str | None = None
 ) -> str | None:
@@ -504,53 +558,20 @@ async def get_latest_version(
         return f"{mc_version}-{build}" if build else None
 
     if loader == "fabric":
-        async with await _get_client() as client:
-            try:
-                resp = await client.get("https://meta.fabricmc.net/v2/versions/loader")
-                resp.raise_for_status()
-                loaders = resp.json()
-                return loaders[0]["version"] if loaders else None
-            except Exception:
-                return None
+        return await _latest_loader_version(
+            "https://meta.fabricmc.net/v2/versions/loader"
+        )
 
     if loader == "quilt":
-        async with await _get_client() as client:
-            try:
-                resp = await client.get("https://meta.quiltmc.org/v3/versions/loader")
-                resp.raise_for_status()
-                loaders = resp.json()
-                return loaders[0]["version"] if loaders else None
-            except Exception:
-                return None
+        return await _latest_loader_version(
+            "https://meta.quiltmc.org/v3/versions/loader"
+        )
 
     if loader == "forge" and mc_version:
-        async with await _get_client() as client:
-            try:
-                resp = await client.get(
-                    "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
-                )
-                resp.raise_for_status()
-                promos = resp.json().get("promos", {})
-                return promos.get(f"{mc_version}-recommended") or promos.get(
-                    f"{mc_version}-latest"
-                )
-            except Exception:
-                return None
+        return await _latest_forge_version(mc_version)
 
     if loader == "neoforge" and mc_version:
-        async with await _get_client() as client:
-            try:
-                resp = await client.get(
-                    "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"
-                )
-                resp.raise_for_status()
-                versions = resp.json().get("versions", [])
-                mc_parts = mc_version.split(".")
-                prefix = f"{mc_parts[1]}." if len(mc_parts) >= 2 else ""
-                matching = [v for v in versions if v.startswith(prefix)]
-                return matching[-1] if matching else None
-            except Exception:
-                return None
+        return await _latest_neoforge_version(mc_version)
 
     return None
 

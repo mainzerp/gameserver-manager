@@ -19,9 +19,22 @@ line-length = 120
 src = ["app", "main.py"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
+select = ["E", "F", "W", "I", "C901"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
+# Legacy high-complexity functions; refactor in future phase
+"app/services/server_manager.py" = ["C901"]
+"app/services/mod_updater.py" = ["C901"]
+"app/services/modpack_importer.py" = ["C901"]
+"app/services/notification_service.py" = ["C901"]
+"app/services/task_scheduler.py" = ["C901"]
+"app/services/server_updater.py" = ["C901"]
+"app/services/steamcmd.py" = ["C901"]
+"app/services/java_manager.py" = ["C901"]
+"app/services/server_detector.py" = ["C901"]
 "app/models/__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]

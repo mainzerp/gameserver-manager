@@ -13,6 +13,7 @@ from app.services.auth import (
     require_role,
     require_server_access,
 )
+from app.services.task_registry import task_registry
 from app.services.task_scheduler import task_scheduler
 from app.template_utils import templates
 
@@ -93,9 +94,7 @@ async def run_task_now(
     task = await db.get(ScheduledTask, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    import asyncio
-
-    asyncio.create_task(task_scheduler.run_task_now(task_id))
+    task_registry.spawn(task_scheduler.run_task_now(task_id))
     return RedirectResponse(url="/scheduler", status_code=303)
 
 
@@ -279,7 +278,5 @@ async def server_run_task_now(
     task = await db.get(ScheduledTask, task_id)
     if not task or task.server_id != server_id:
         raise HTTPException(status_code=404, detail="Task not found")
-    import asyncio
-
-    asyncio.create_task(task_scheduler.run_task_now(task_id))
+    task_registry.spawn(task_scheduler.run_task_now(task_id))
     return RedirectResponse(url=f"/servers/{server_id}?tab=scheduler", status_code=303)

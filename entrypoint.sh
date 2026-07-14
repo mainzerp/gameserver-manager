@@ -12,4 +12,11 @@ else
     echo "Using existing TLS certificate."
 fi
 
+# Enable SSL by default when the generated certificate is present and SSL is not explicitly disabled.
+if [ -f /app/certs/cert.pem ] && [ -f /app/certs/key.pem ] && [ "${GSM_SSL_ENABLED:-}" != "false" ]; then
+    export GSM_SSL_ENABLED=${GSM_SSL_ENABLED:-1}
+    export GSM_SSL_CERTFILE=${GSM_SSL_CERTFILE:-/app/certs/cert.pem}
+    export GSM_SSL_KEYFILE=${GSM_SSL_KEYFILE:-/app/certs/key.pem}
+fi
+
 exec "$@"

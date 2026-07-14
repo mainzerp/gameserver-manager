@@ -18,6 +18,18 @@ from app.database import Base
 from app.models.server import Server, ServerStatus, ServerType
 from app.models.workshop_item import WorkshopItem
 from app.routers import servers
+from app.routers.servers import (
+    _shared as servers_shared,
+    server_config,
+    server_control,
+    server_core,
+    server_crud,
+    server_logs,
+    server_misc,
+    server_players,
+    server_steam,
+    server_worlds,
+)
 
 
 class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
@@ -58,10 +70,10 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
 
         self.original_servers_dir = servers.settings.servers_dir
         self.original_steamcmd_path = servers.steamcmd._steamcmd_path
-        self.original_async_session = servers.async_session
+        self.original_async_session = servers_shared.async_session
         servers.settings.servers_dir = self.temp_dir.name
         servers.steamcmd._steamcmd_path = __file__
-        servers.async_session = self.session_maker
+        servers_shared.async_session = self.session_maker
 
         self.spawned = []
 
@@ -69,37 +81,72 @@ class SteamRouteTests(unittest.IsolatedAsyncioTestCase):
             self.spawned.append(coro)
             coro.close()
 
-        self.spawn_patch = patch.object(servers, "_spawn_background_task", side_effect=capture_task)
-        self.role_patch = patch.object(
-            servers,
-            "require_role",
-            AsyncMock(return_value=SimpleNamespace(id=1, role="admin")),
+        self.spawn_patch_crud = patch(
+            "app.routers.servers.server_crud.spawn_background_task",
+            side_effect=capture_task,
         )
-        self.access_patch = patch.object(
-            servers,
-            "require_server_access",
-            AsyncMock(return_value=SimpleNamespace(id=1, role="admin")),
+        self.spawn_patch_steam = patch(
+            "app.routers.servers.server_steam.spawn_background_task",
+            side_effect=capture_task,
         )
+        self.spawn_patch_control = patch(
+            "app.routers.servers.server_control.spawn_background_task",
+            side_effect=capture_task,
+        )
+
+        self.role_access_patches = []
+        for module in (
+            server_config,
+            server_control,
+            server_core,
+            server_crud,
+            server_logs,
+            server_misc,
+            server_players,
+            server_steam,
+            server_worlds,
+        ):
+            if hasattr(module, "require_role"):
+                self.role_access_patches.append(
+                    patch.object(
+                        module,
+                        "require_role",
+                        AsyncMock(return_value=SimpleNamespace(id=1, role="admin")),
+                    )
+                )
+            if hasattr(module, "require_server_access"):
+                self.role_access_patches.append(
+                    patch.object(
+                        module,
+                        "require_server_access",
+                        AsyncMock(return_value=SimpleNamespace(id=1, role="admin")),
+                    )
+                )
+
         self.log_patch = patch.object(servers.audit_service, "log", AsyncMock(return_value=None))
         self.create_task_patch = patch.object(
             servers.audit_service, "create_task", side_effect=lambda coro: coro.close()
         )
 
-        self.spawn_patch.start()
-        self.role_patch.start()
-        self.access_patch.start()
+        self.spawn_patch_crud.start()
+        self.spawn_patch_steam.start()
+        self.spawn_patch_control.start()
+        for p in self.role_access_patches:
+            p.start()
         self.log_patch.start()
         self.create_task_patch.start()
 
     async def asyncTearDown(self):
-        self.spawn_patch.stop()
-        self.role_patch.stop()
-        self.access_patch.stop()
+        self.spawn_patch_crud.stop()
+        self.spawn_patch_steam.stop()
+        self.spawn_patch_control.stop()
+        for p in self.role_access_patches:
+            p.stop()
         self.log_patch.stop()
         self.create_task_patch.stop()
         servers.settings.servers_dir = self.original_servers_dir
         servers.steamcmd._steamcmd_path = self.original_steamcmd_path
-        servers.async_session = self.original_async_session
+        servers_shared.async_session = self.original_async_session
         await self.client.aclose()
         await self.engine.dispose()
         self.temp_dir.cleanup()

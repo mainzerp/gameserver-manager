@@ -8,23 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session
 from app.models.audit_log import AuditLog
+from app.services.task_registry import task_registry
 
 logger = logging.getLogger(__name__)
 
 
 class AuditService:
-    def __init__(self):
-        self._pending_tasks: set[asyncio.Task] = set()
-
     def create_task(self, coro) -> asyncio.Task:
-        task = asyncio.create_task(coro)
-        self._pending_tasks.add(task)
-        task.add_done_callback(self._pending_tasks.discard)
-        return task
+        """Spawn a background task through the central registry."""
+        return task_registry.spawn(coro)
 
     async def flush(self):
-        if self._pending_tasks:
-            await asyncio.gather(*self._pending_tasks, return_exceptions=True)
+        await task_registry.flush()
 
     async def log(
         self,
@@ -49,8 +44,8 @@ class AuditService:
                 )
                 session.add(entry)
                 await session.commit()
-        except Exception as e:
-            logger.warning(f"Audit log failed: {e}")
+        except Exception:
+            logger.exception("Audit log failed")
 
     async def query(
         self,
@@ -90,8 +85,8 @@ class AuditService:
                 )
                 await session.commit()
                 logger.info(f"Cleaned up audit logs older than {days} days")
-        except Exception as e:
-            logger.warning(f"Audit cleanup failed: {e}")
+        except Exception:
+            logger.exception("Audit cleanup failed")
 
 
 def get_audit_context(request: Request) -> dict:
