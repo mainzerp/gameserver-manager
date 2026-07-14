@@ -1,0 +1,15 @@
+# Shell scripts run inside Linux containers and must keep LF line endings.
+*.sh text eol=lf
+
+# Project source files are normalized to LF for cross-platform consistency.
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.txt text eol=lf
+*.ini text eol=lf
