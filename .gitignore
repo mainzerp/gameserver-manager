@@ -22,8 +22,9 @@ env/
 .env
 
 # Database
-data/*.db
-data/backups/
+data/
+certs/
+logs/
 
 # Archives
 *.zip
