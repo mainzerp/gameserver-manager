@@ -64,23 +64,27 @@ MAX_UPLOAD_SIZE = 50 * 1024 * 1024
 
 
 def _safe_resolve(server_path: str, rel_path: str) -> Path:
-    """Resolve a relative path within the server directory, preventing path traversal."""
+    """Resolve a relative path within the server directory, preventing path traversal and symlinks."""
     base = Path(server_path).resolve()
-    # Normalize and join
-    target = (base / rel_path).resolve()
-    # Ensure the resolved path is still within the server directory
+    # Normalize without following symlinks so we can inspect each component
+    candidate = Path(os.path.normpath(base / rel_path))
+    # Reject any symlink in the requested path (including the final component)
+    for p in [candidate, *candidate.parents]:
+        if p == base or not p.is_relative_to(base):
+            break
+        try:
+            if stat.S_ISLNK(os.lstat(p).st_mode):
+                raise HTTPException(
+                    status_code=403, detail="Access denied: path is a symlink"
+                )
+        except FileNotFoundError:
+            pass
+    # Resolve and block path traversal
+    target = candidate.resolve()
     if not target.is_relative_to(base):
         raise HTTPException(
             status_code=403, detail="Access denied: path outside server directory"
         )
-    # TOCTOU: verify the resolved path has not been replaced by a symlink
-    try:
-        if stat.S_ISLNK(os.lstat(target).st_mode):
-            raise HTTPException(
-                status_code=403, detail="Access denied: path is a symlink"
-            )
-    except FileNotFoundError:
-        pass
     return target
 
 
