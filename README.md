@@ -131,9 +131,25 @@ cp .env.example .env
 docker compose up -d
 ```
 
+The `docker-compose.yml` uses the pre-built image `ghcr.io/mainzerp/gameserver-manager:latest` from the GitHub Container Registry, so no local build is required.
+
 The panel will be available at **https://localhost:8443** by default. Set `GSM_HOST_PORT` in `.env` to use a different host port (for example, `GSM_HOST_PORT=9000`).
 
 The Docker image includes Java 8, 17, 21, and 25 for Minecraft server compatibility.
+
+### Building from Source
+
+If you prefer to build the image locally instead of using the pre-built image, edit `docker-compose.yml` and replace the `image:` line with:
+
+```yaml
+    build: ./gsm
+```
+
+Then run:
+
+```bash
+docker compose up -d --build
+```
 
 ### Testing with Docker
 

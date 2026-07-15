@@ -1,6 +1,6 @@
 services:
   gameserver-manager:
-    build: ./gsm
+    image: ghcr.io/mainzerp/gameserver-manager:latest
     container_name: gameserver_manager
     restart: unless-stopped
     ports:

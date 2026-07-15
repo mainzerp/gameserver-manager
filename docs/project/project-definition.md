@@ -361,9 +361,9 @@ Many settings can also be configured at runtime through the admin settings panel
 ## Docker
 
 `docker-compose.yml` defines two services:
-- `gameserver-manager`: The application (Python 3.12 + Java 8/17/21/25)
+- `gameserver-manager`: The application, using the pre-built image `ghcr.io/mainzerp/gameserver-manager:latest`
 - `db`: PostgreSQL 17 Alpine
 
-The Dockerfile generates a self-signed TLS certificate for HTTPS out of the box.
+The image includes a self-signed TLS certificate for HTTPS out of the box.
 
-Volumes: `./data` (database, backups), `./servers` (game server files), `pgdata` (PostgreSQL data).
+Volumes: `gsm_data` (data, backups), `gsm_servers` (game server files), `pgdata` (PostgreSQL data), `gsm_certs` (TLS certificates), `gsm_steamcmd` (SteamCMD).
