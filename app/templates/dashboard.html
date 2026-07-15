@@ -107,7 +107,7 @@
     <div class="card-body py-16 text-center">
         <svg class="w-16 h-16 mx-auto mb-4" style="color: var(--clr-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
+                d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 0 00-2-2"/>
         </svg>
         <h2 class="text-xl font-semibold mb-2" style="color: var(--clr-text-primary);">{{ _("No servers found") }}</h2>
         <p class="mb-6" style="color: var(--clr-text-secondary);">{{ _("Create your first game server to get started.") }}</p>
@@ -121,33 +121,66 @@
 </div>
 {% endif %}
 
-{% if steamcmd_available %}
-<div class="card mt-6">
-    <div class="card-body flex items-center gap-3 py-3">
-        <svg class="w-5 h-5 flex-shrink-0" style="color: var(--clr-success);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span class="text-sm" style="color: var(--clr-text-secondary);">SteamCMD detected &mdash; Steam game servers can be installed.</span>
-    </div>
-</div>
-{% else %}
-<div class="card mt-6">
-    <div class="card-body flex items-center justify-between gap-3 py-3">
-        <div class="flex items-center gap-3">
-            <svg class="w-5 h-5 flex-shrink-0" style="color: var(--clr-warning);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+<!-- Dashboard Overview -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <!-- Server Type Distribution -->
+    <div class="card">
+        <div class="card-header flex items-center gap-2">
+            <svg class="w-5 h-5" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
             </svg>
-            <span class="text-sm" style="color: var(--clr-text-secondary);">SteamCMD not installed &mdash; required for Steam game servers.</span>
+            {{ _("Server Types") }}
         </div>
-        {% if current_user.role.value == 'admin' %}
-        <form method="post" action="/settings/steamcmd/install" class="inline">
-            {{ csrf_field(request) }}
-            <button type="submit" class="btn btn-primary btn-sm">Install SteamCMD</button>
-        </form>
-        {% endif %}
+        <div class="card-body">
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="p-3 rounded-lg" style="background: var(--clr-elevated);">
+                    <p class="text-2xl font-bold" style="color: var(--clr-text-primary);">{{ type_counts.minecraft_java }}</p>
+                    <p class="text-xs" style="color: var(--clr-text-muted);">{{ _("Minecraft Java") }}</p>
+                </div>
+                <div class="p-3 rounded-lg" style="background: var(--clr-elevated);">
+                    <p class="text-2xl font-bold" style="color: var(--clr-text-primary);">{{ type_counts.minecraft_bedrock }}</p>
+                    <p class="text-xs" style="color: var(--clr-text-muted);">{{ _("Minecraft Bedrock") }}</p>
+                </div>
+                <div class="p-3 rounded-lg" style="background: var(--clr-elevated);">
+                    <p class="text-2xl font-bold" style="color: var(--clr-text-primary);">{{ type_counts.steam }}</p>
+                    <p class="text-xs" style="color: var(--clr-text-muted);">{{ _("Steam") }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Updates & Tasks -->
+    <div class="card">
+        <div class="card-header flex items-center gap-2">
+            <svg class="w-5 h-5" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {{ _("Overview") }}
+        </div>
+        <div class="card-body">
+            <div class="grid grid-cols-2 gap-4">
+                <a href="/servers" class="p-4 rounded-lg flex items-center justify-between" style="background: var(--clr-elevated);">
+                    <div>
+                        <p class="text-xs" style="color: var(--clr-text-muted);">{{ _("Mod Updates Available") }}</p>
+                        <p class="text-2xl font-bold" style="color: var(--clr-text-primary);">{{ total_mod_updates }}</p>
+                    </div>
+                    <svg class="w-5 h-5" style="color: var(--clr-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                <a href="/scheduler" class="p-4 rounded-lg flex items-center justify-between" style="background: var(--clr-elevated);">
+                    <div>
+                        <p class="text-xs" style="color: var(--clr-text-muted);">{{ _("Scheduled Tasks") }}</p>
+                        <p class="text-2xl font-bold" style="color: var(--clr-text-primary);">{{ scheduled_tasks_count }}</p>
+                    </div>
+                    <svg class="w-5 h-5" style="color: var(--clr-text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
     </div>
 </div>
-{% endif %}
 
 {% if multi_node_enabled and nodes is defined and nodes | length > 1 %}
 <div class="mt-8">
