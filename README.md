@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.svg" alt="GameServer Manager Logo" width="160">
+</p>
+
 # GameServer Manager
 
 ![Quality](https://img.shields.io/github/actions/workflow/status/mainzerp/gameserver-manager/ci.yml?branch=main&job=quality&label=Quality&logo=github)
