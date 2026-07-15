@@ -307,6 +307,8 @@ async def create_server(
         if not os.path.exists(props_path):
             overrides = {
                 "server-port": str(port),
+                "query.port": str(port),
+                "enable-query": "true",
                 "motd": motd,
                 "max-players": str(max_players),
                 "difficulty": difficulty,

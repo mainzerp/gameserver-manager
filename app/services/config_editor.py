@@ -80,7 +80,7 @@ MC_JAVA_FIELDS = {
         "max": 65535,
         "default": 25575,
     },
-    "enable-query": {"type": "boolean", "label": "Enable Query", "default": False},
+    "enable-query": {"type": "boolean", "label": "Enable Query", "default": True},
     "server-ip": {"type": "string", "label": "Server IP", "default": ""},
     "simulation-distance": {
         "type": "number",
@@ -140,7 +140,7 @@ MINECRAFT_JAVA_DEFAULTS = {
     "enable-rcon": "false",
     "rcon.port": "25575",
     "rcon.password": "",
-    "enable-query": "false",
+    "enable-query": "true",
     "query.port": "25565",
     "broadcast-rcon-to-ops": "true",
     "broadcast-console-to-ops": "true",
