@@ -568,6 +568,42 @@ class ServerManager:
     ) -> bool:
         return server_id in self._processes or server_id in self._docker_processes
 
+    def monitoring_status(self, server_id: int) -> dict:
+        """Return whether per-server CPU/RAM monitoring is available.
+
+        The result includes a human-readable reason when monitoring is not
+        available and a flag indicating whether the caller should show a
+        banner to the user.
+        """
+        if not self.is_running(server_id):
+            return {
+                "available": False,
+                "reason": "stopped",
+                "show_banner": False,
+            }
+
+        if server_id in self._docker_processes:
+            return {
+                "available": False,
+                "reason": "Docker container",
+                "show_banner": True,
+            }
+
+        if server_id in self._processes:
+            return {
+                "available": True,
+                "reason": None,
+                "show_banner": False,
+            }
+
+        # Server is reported as running but we have no process handle. This can
+        # happen with multi-node remote servers or daemonized Steam wrappers.
+        return {
+            "available": False,
+            "reason": "Process not tracked",
+            "show_banner": True,
+        }
+
     async def _stop_docker_server(
         self, server_id: int, db: AsyncSession
     ) -> bool:

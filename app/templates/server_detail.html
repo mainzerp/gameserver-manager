@@ -278,6 +278,16 @@
     <div class="card mb-6" id="resource-panel">
         <div class="card-header">Resource Monitoring</div>
         <div class="card-body">
+            {% if monitoring_status.show_banner %}
+            <div class="mb-4 p-3 rounded-lg border flex items-center gap-3" style="background: var(--clr-warning-bg); border-color: var(--clr-warning);">
+                <svg class="w-5 h-5 flex-shrink-0" style="color: var(--clr-warning);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="text-sm" style="color: var(--clr-warning);">
+                    {{ _("Resource monitoring unavailable") }} &mdash; {{ monitoring_status.reason }}
+                </span>
+            </div>
+            {% endif %}
             <div id="resource-running" {% if not is_running %}class="hidden"{% endif %}>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -2571,6 +2581,8 @@ function createConsoleLine(text) {
 <!-- Resource Monitoring (always active) -->
 <script nonce="{{ request.state.csp_nonce }}">
 (function() {
+    var monitoringUnavailable = {{ 'true' if monitoring_status.show_banner else 'false' }};
+
     function updateServerStats() {
         fetch('/servers/{{ server.id }}/stats')
             .then(r => r.json())
@@ -2578,6 +2590,13 @@ function createConsoleLine(text) {
                 const stats = d && d.data ? d.data : d;
                 const runningEl = document.getElementById('resource-running');
                 const offlineEl = document.getElementById('resource-offline');
+                if (monitoringUnavailable) {
+                    // Monitoring is not available for this server (e.g. Docker).
+                    // Keep the banner visible and hide the offline message.
+                    if (runningEl) runningEl.classList.add('hidden');
+                    if (offlineEl) offlineEl.classList.add('hidden');
+                    return;
+                }
                 if (stats.running && stats.process) {
                     if (runningEl) runningEl.classList.remove('hidden');
                     if (offlineEl) offlineEl.classList.add('hidden');

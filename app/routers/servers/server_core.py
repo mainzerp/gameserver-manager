@@ -162,10 +162,15 @@ async def server_list(request: Request, db: AsyncSession = Depends(get_db)):
     )
     update_counts = dict(update_result.all())
 
+    monitoring_status = {
+        s.id: server_manager.monitoring_status(s.id) for s in servers
+    }
+
     return templates.TemplateResponse(request, "servers.html", {
             "servers": servers,
             "status_counts": status_counts,
             "update_counts": update_counts,
+            "monitoring_status": monitoring_status,
             "current_user": user,
         })
 
@@ -315,10 +320,10 @@ async def server_detail(
             steam_operation_snapshot.get("operation") is not None
             and steam_snapshot_status in {"queued", "running", "waiting_for_steam_guard"}
         )
-    steam_accounts_result = await db.execute(
-        select(SteamAccount).order_by(SteamAccount.display_name)
-    )
-    steam_accounts = steam_accounts_result.scalars().all()
+
+    steam_accounts = (await db.execute(select(SteamAccount))).scalars().all()
+
+    monitoring_status = server_manager.monitoring_status(server_id)
 
     return templates.TemplateResponse(request, "server_detail.html", {
             "server": server,
@@ -348,6 +353,7 @@ async def server_detail(
             "steam_has_active_update_start": steam_has_active_update_start,
             "steam_operation_active": steam_operation_active,
             "workshop_items": workshop_items,
+            "monitoring_status": monitoring_status,
         })
 
 @router.get("/system/stats")

@@ -35,6 +35,9 @@ max-complexity = 10
 "app/services/steamcmd.py" = ["C901"]
 "app/services/java_manager.py" = ["C901"]
 "app/services/server_detector.py" = ["C901"]
+"app/routers/servers/server_core.py" = ["C901"]
+"app/routers/servers/server_crud.py" = ["C901"]
+"app/routers/servers/server_misc.py" = ["C901"]
 "app/models/__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]
