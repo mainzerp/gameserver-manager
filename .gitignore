@@ -29,8 +29,8 @@ logs/
 # Archives
 *.zip
 
-# Server files (managed by the app)
-servers/
+# Server files (managed by the app) — only the root data directory, not app/routers/servers
+/servers/
 
 # Node.js (Tailwind CSS build tooling)
 node_modules/
