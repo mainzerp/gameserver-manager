@@ -26,6 +26,7 @@ from app.services.port_manager import port_manager
 from app.services.resource_monitor import resource_monitor
 from app.services.server_manager import server_manager
 from app.services.server_updater import server_updater
+from app.services.status_service import status_service
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,18 @@ async def server_stats(
             "system": resource_monitor.get_system_stats(),
         }
     )
+
+@router.get("/servers/{server_id}/telemetry")
+async def server_telemetry(
+    request: Request, server_id: int, db: AsyncSession = Depends(get_db)
+):
+    await require_server_access(request, server_id, "view", db)
+    server = await db.get(Server, server_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    telemetry = await status_service.get_server_telemetry(server)
+    return JSONResponse(telemetry)
 
 @router.get("/servers/{server_id}/metrics", response_class=JSONResponse)
 async def get_server_metrics(

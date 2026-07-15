@@ -135,6 +135,7 @@
                     <th class="px-4 py-3 font-medium" style="color: var(--clr-text-secondary);">Port</th>
                     <th class="px-4 py-3 font-medium" style="color: var(--clr-text-secondary);">CPU</th>
                     <th class="px-4 py-3 font-medium" style="color: var(--clr-text-secondary);">RAM</th>
+                    <th class="px-4 py-3 font-medium" style="color: var(--clr-text-secondary);">Players</th>
                     <th class="px-4 py-3 font-medium" style="color: var(--clr-text-secondary);">Updates</th>
                     <th class="px-4 py-3 font-medium text-right" style="color: var(--clr-text-secondary);">Actions</th>
                 </tr>
@@ -188,6 +189,9 @@
                     </td>
                     <td class="px-4 py-3 border-b" style="border-color: var(--clr-border);">
                         <span class="server-ram-text" style="color: var(--clr-text-secondary);">--</span>
+                    </td>
+                    <td class="px-4 py-3 border-b" style="border-color: var(--clr-border);">
+                        <span class="server-players-text" style="color: var(--clr-text-secondary);">--</span>
                     </td>
                     <td class="px-4 py-3 border-b" style="border-color: var(--clr-border);">
                         {% if update_counts.get(server.id, 0) > 0 %}
@@ -354,6 +358,20 @@ function updateServerStats() {
                     ramText.textContent = d.ram_mb + ' MB';
                 } else if (d.ram_percent !== undefined) {
                     ramText.textContent = d.ram_percent + '%';
+                }
+            })
+            .catch(function() {});
+
+        fetch('/servers/' + serverId + '/telemetry')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var playersText = row.querySelector('.server-players-text');
+                if (d.player_count !== undefined && d.player_count !== null) {
+                    playersText.textContent = d.player_count + '/' + (d.max_players || '?');
+                } else if (d.is_online) {
+                    playersText.textContent = 'N/A';
+                } else {
+                    playersText.textContent = '--';
                 }
             })
             .catch(function() {});
