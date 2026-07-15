@@ -1,6 +1,6 @@
 services:
   gameserver-manager:
-    build: .
+    build: ./gsm
     container_name: gameserver_manager
     restart: unless-stopped
     ports:

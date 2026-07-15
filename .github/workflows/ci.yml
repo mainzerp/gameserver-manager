@@ -15,17 +15,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r gsm/requirements.txt
           pip install ruff pytest pytest-asyncio
 
       - name: Lint
-        run: ruff check app main.py
+        run: ruff check gsm/app gsm/main.py
 
       - name: Test
-        run: pytest tests/ -q
+        run: pytest gsm/tests/ -q
 
       - name: Check single Alembic head
         run: |
+          cd gsm
           alembic heads | tee /tmp/alembic_heads.txt
           # There must be exactly one head revision.
           head_count=$(grep -c "^[a-f0-9]" /tmp/alembic_heads.txt || true)
@@ -40,6 +41,7 @@ jobs:
         # authoritative guard against branched migrations.
         continue-on-error: true
         run: |
+          cd gsm
           GSM_SECRET_KEY="ci-test-key-not-for-prod" \
           GSM_DATABASE_URL="sqlite:///./ci_migrate_check.db" \
           python -c "import asyncio; from app.database import init_db; asyncio.run(init_db())"
@@ -58,10 +60,10 @@ jobs:
         run: pip install bandit pip-audit
 
       - name: Bandit scan
-        run: bandit -r app -ll -ii || true
+        run: bandit -r gsm/app -ll -ii || true
 
       - name: Dependency audit
-        run: pip-audit -r requirements.txt || true
+        run: pip-audit -r gsm/requirements.txt || true
 
   docker:
     runs-on: ubuntu-latest
@@ -74,7 +76,7 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./gsm
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -86,164 +86,147 @@ FastAPI (app/main.py)
 gameserver/
 |-- .env.example                  # Template for environment variables
 |-- .gitignore                    # Git ignore rules
-|-- alembic.ini                   # Alembic migration configuration
-|-- babel.cfg                     # Babel i18n extraction config
 |-- docker-compose.yml            # Docker Compose (app + PostgreSQL 17)
-|-- Dockerfile                    # Multi-Java Docker image (JDK 8, 17, 21, 25)
-|-- main.py                       # Application entry point (uvicorn runner)
-|-- package.json                  # Tailwind CSS build tooling
 |-- README.md                     # Project documentation
-|-- requirements.txt              # Python dependencies
-|-- tailwind.config.js            # Tailwind CSS configuration
 |-- TODO.md                       # Completed roadmap (all 58 items done)
 |-- VERSION.md                    # Version history and changelog
+|-- pyproject.toml                # Build, lint, and test configuration
 |
 |-- .github/
 |   |-- copilot-instructions.md   # Copilot agent configuration
-|   |-- instructions/
-|       |-- project-definition.md # This file
-|
-|-- alembic/
-|   |-- env.py                    # Alembic environment configuration
-|   |-- script.py.mako            # Migration template
-|   |-- versions/                 # 32 migration files (initial through batch 7)
-|
-|-- app/
-|   |-- __init__.py
-|   |-- config.py                 # Pydantic Settings (50+ configuration fields)
-|   |-- database.py               # SQLAlchemy async engine and session setup
-|   |-- i18n.py                   # Internationalization setup (Babel)
-|   |-- main.py                   # FastAPI app, lifespan, middleware, router registration
-|   |-- template_utils.py         # Jinja2 template helpers
-|   |-- validation.py             # Input validation utilities
-|   |
-|   |-- middleware/
-|   |   |-- csrf.py               # CSRF protection middleware
-|   |
-|   |-- models/                   # 17 SQLAlchemy ORM models
-|   |   |-- api_key.py            # API key model
-|   |   |-- audit_log.py          # Audit log entries
-|   |   |-- backup.py             # Backup records
-|   |   |-- metric.py             # Resource metrics (CPU, RAM, disk)
-|   |   |-- mod.py                # Installed mods per server
-|   |   |-- node.py               # Multi-node panel nodes
-|   |   |-- scheduled_task.py     # Cron-like scheduled tasks
-|   |   |-- server.py             # Server model + ServerType/ServerStatus enums
-|   |   |-- server_access.py      # Per-server user access permissions
-|   |   |-- site_settings.py      # Site-wide settings (key-value)
-|   |   |-- user.py               # User model (auth, RBAC, TOTP)
-|   |   |-- webauthn_credential.py # WebAuthn passkey credentials
-|   |   |-- webhook.py            # Custom webhook definitions
-|   |
-|   |-- routers/                  # 17 web routers + API v1 sub-routers
-|   |   |-- api_keys.py           # API key management UI
-|   |   |-- audit.py              # Audit log viewer
-|   |   |-- auth.py               # Login, logout, setup, 2FA
-|   |   |-- backups.py            # Backup management UI
-|   |   |-- files.py              # File browser + editor
-|   |   |-- metrics.py            # Prometheus metrics endpoint
-|   |   |-- mods.py               # Mod management (search, install, update)
-|   |   |-- nodes.py              # Multi-node management UI
-|   |   |-- scheduler.py          # Scheduled task management UI
-|   |   |-- servers.py            # Server CRUD + controls (dashboard)
-|   |   |-- site_settings.py      # Admin settings panel
-|   |   |-- status.py             # Public status page
-|   |   |-- users.py              # User management (admin)
-|   |   |-- webhooks.py           # Webhook management UI
-|   |   |-- ws.py                 # WebSocket console endpoint
-|   |   |-- api_v1/               # REST API v1 (JSON)
-|   |       |-- __init__.py       # API router aggregation + API key auth
-|   |       |-- servers.py        # Server API endpoints
-|   |       |-- backups.py        # Backup API endpoints
-|   |       |-- schedules.py      # Schedule API endpoints
-|   |       |-- system.py         # System status API endpoints
-|   |       |-- versions.py       # MC version API endpoints
-|   |
-|   |-- schemas/                  # Pydantic request/response schemas
-|   |   |-- backup.py
-|   |   |-- common.py
-|   |   |-- schedule.py
-|   |   |-- server.py
-|   |   |-- system.py
-|   |
-|   |-- services/                 # 37 service modules
-|   |   |-- api_key_service.py    # API key generation and validation
-|   |   |-- audit_service.py      # Audit log recording and cleanup
-|   |   |-- auth.py               # Authentication, session management, RBAC
-|   |   |-- backup_manager.py     # Backup creation, restoration, rotation
-|   |   |-- docker_manager.py     # Docker container lifecycle management
-|   |   |-- email_service.py      # SMTP email notifications
-|   |   |-- jar_downloader.py     # MC server JAR download (Vanilla/Fabric/Paper/Forge/NeoForge/Quilt)
-|   |   |-- java_manager.py       # Java version detection + MC version mapping
-|   |   |-- log_manager.py        # Log persistence and search
-|   |   |-- mod_updater.py        # Modrinth + CurseForge mod management
-|   |   |-- node_manager.py       # Multi-node registration and health checks
-|   |   |-- notification_service.py # Discord/webhook notification dispatch
-|   |   |-- player_manager.py     # Online player list, whitelist, bans
-|   |   |-- port_manager.py       # Port allocation and conflict detection
-|   |   |-- query_protocol.py     # Minecraft SLP + Steam A2S query protocols
-|   |   |-- rcon_client.py        # RCON remote console client
-|   |   |-- resource_monitor.py   # CPU/RAM/disk metric collection
-|   |   |-- server_detector.py    # Detect existing server installations for import
-|   |   |-- server_manager.py     # Process management (start/stop/command/logs)
-|   |   |-- server_templates.py   # Server quick-setup presets
-|   |   |-- server_updater.py     # Automatic server version update checking
-|   |   |-- settings_service.py   # Site settings persistence
-|   |   |-- sftp_server.py        # SFTP file access server
-|   |   |-- status_service.py     # Public status page data
-|   |   |-- steamcmd.py           # SteamCMD wrapper (install/update Steam servers)
-|   |   |-- task_scheduler.py     # Cron-like task scheduling engine
-|   |   |-- update_checker.py     # Panel self-update checker
-|   |   |-- version_cache.py      # MC version caching
-|   |   |-- webauthn_service.py   # WebAuthn passkey registration/verification
-|   |   |-- world_manager.py      # Minecraft world management
-|   |
-|   |-- static/                   # Static assets
-|   |   |-- css/                  # Compiled Tailwind CSS
-|   |   |-- js/                   # Client-side JavaScript
-|   |   |-- icons/                # App icons
-|   |   |-- manifest.json         # PWA manifest
-|   |   |-- offline.html          # PWA offline fallback
-|   |
-|   |-- templates/                # 26 Jinja2 HTML templates
-|       |-- base.html             # Base layout (dark theme, nav, i18n)
-|       |-- dashboard.html        # Server list with status cards
-|       |-- login.html            # Login page
-|       |-- setup.html            # Initial admin setup
-|       |-- server_create.html    # Server creation form
-|       |-- server_detail.html    # Server detail + console
-|       |-- server_import.html    # Import existing servers
-|       |-- mods.html             # Mod management table
-|       |-- mod_search.html       # Mod search interface
-|       |-- file_browser.html     # Directory listing
-|       |-- file_editor.html      # Text file editor
-|       |-- backups.html          # Backup management
-|       |-- scheduler.html        # Scheduled tasks
-|       |-- users.html            # User management
-|       |-- user_access.html      # Per-server user access
-|       |-- api_keys.html         # API key management
-|       |-- audit_log.html        # Audit log viewer
-|       |-- webhooks.html         # Webhook management
-|       |-- nodes.html            # Multi-node management
-|       |-- site_settings.html    # Admin settings panel
-|       |-- status.html           # Public status page
-|       |-- player_management.html # Player whitelist/bans
-|       |-- totp_setup.html       # TOTP 2FA setup
-|       |-- totp_verify.html      # TOTP verification
-|       |-- webauthn_register.html # WebAuthn passkey registration
-|
-|-- data/
-|   |-- backups/                  # Server backup archives
+|   |-- workflows/                # CI/CD workflows
 |
 |-- docs/
 |   |-- database-backends.md      # PostgreSQL/SQLite/MySQL setup guide
+|   |-- project/                  # Project rules, learnings, and definition
 |   |-- reverse-proxy/            # Nginx, Caddy, Traefik config examples
+|   |-- screenshots/              # README screenshots
+|
+|-- gsm/                          # GameServer Manager application
+|   |-- Dockerfile                # Multi-Java Docker image (JDK 8, 17, 21, 25)
+|   |-- main.py                   # Application entry point (uvicorn runner)
+|   |-- requirements.txt          # Python dependencies
+|   |-- package.json              # Tailwind CSS build tooling
+|   |-- tailwind.config.js        # Tailwind CSS configuration
+|   |-- alembic.ini               # Alembic migration configuration
+|   |-- babel.cfg                 # Babel i18n extraction config
+|   |
+|   |-- alembic/
+|   |   |-- env.py                # Alembic environment configuration
+|   |   |-- script.py.mako        # Migration template
+|   |   |-- versions/             # 32 migration files (initial through batch 7)
+|   |
+|   |-- app/
+|   |   |-- __init__.py
+|   |   |-- config.py             # Pydantic Settings (50+ configuration fields)
+|   |   |-- database.py           # SQLAlchemy async engine and session setup
+|   |   |-- i18n.py               # Internationalization setup (Babel)
+|   |   |-- main.py               # FastAPI app, lifespan, middleware, router registration
+|   |   |-- template_utils.py     # Jinja2 template helpers
+|   |   |-- validation.py         # Input validation utilities
+|   |   |
+|   |   |-- middleware/
+|   |   |   |-- csrf.py           # CSRF protection middleware
+|   |   |
+|   |   |-- models/               # 17 SQLAlchemy ORM models
+|   |   |   |-- api_key.py        # API key model
+|   |   |   |-- audit_log.py      # Audit log entries
+|   |   |   |-- backup.py         # Backup records
+|   |   |   |-- metric.py         # Resource metrics (CPU, RAM, disk)
+|   |   |   |-- mod.py            # Installed mods per server
+|   |   |   |-- node.py           # Multi-node panel nodes
+|   |   |   |-- scheduled_task.py # Cron-like scheduled tasks
+|   |   |   |-- server.py         # Server model + ServerType/ServerStatus enums
+|   |   |   |-- server_access.py  # Per-server user access permissions
+|   |   |   |-- site_settings.py  # Site-wide settings (key-value)
+|   |   |   |-- user.py           # User model (auth, RBAC, TOTP)
+|   |   |   |-- webauthn_credential.py # WebAuthn passkey credentials
+|   |   |   |-- webhook.py        # Custom webhook definitions
+|   |   |
+|   |   |-- routers/              # 17 web routers + API v1 sub-routers
+|   |   |   |-- api_keys.py       # API key management UI
+|   |   |   |-- audit.py          # Audit log viewer
+|   |   |   |-- auth.py           # Login, logout, setup, 2FA
+|   |   |   |-- backups.py        # Backup management UI
+|   |   |   |-- files.py          # File browser + editor
+|   |   |   |-- metrics.py        # Prometheus metrics endpoint
+|   |   |   |-- mods.py           # Mod management (search, install, update)
+|   |   |   |-- nodes.py          # Multi-node management UI
+|   |   |   |-- scheduler.py      # Scheduled task management UI
+|   |   |   |-- servers/          # Server CRUD + controls + Steam + players
+|   |   |   |-- site_settings.py  # Admin settings panel
+|   |   |   |-- status.py         # Public status page
+|   |   |   |-- users.py          # User management (admin)
+|   |   |   |-- webhooks.py       # Webhook management UI
+|   |   |   |-- ws.py             # WebSocket console endpoint
+|   |   |   |-- api_v1/           # REST API v1 (JSON)
+|   |   |       |-- __init__.py   # API router aggregation + API key auth
+|   |   |       |-- servers.py    # Server API endpoints
+|   |   |       |-- backups.py    # Backup API endpoints
+|   |   |       |-- schedules.py  # Schedule API endpoints
+|   |   |       |-- system.py     # System status API endpoints
+|   |   |       |-- versions.py   # MC version API endpoints
+|   |   |
+|   |   |-- schemas/              # Pydantic request/response schemas
+|   |   |   |-- backup.py
+|   |   |   |-- common.py
+|   |   |   |-- schedule.py
+|   |   |   |-- server.py
+|   |   |   |-- system.py
+|   |   |
+|   |   |-- services/             # 37 service modules
+|   |   |   |-- api_key_service.py
+|   |   |   |-- audit_service.py
+|   |   |   |-- auth.py
+|   |   |   |-- backup_storage.py
+|   |   |   |-- docker_manager.py
+|   |   |   |-- email_service.py
+|   |   |   |-- jar_downloader.py
+|   |   |   |-- java_manager.py
+|   |   |   |-- log_manager.py
+|   |   |   |-- mod_updater.py
+|   |   |   |-- node_manager.py
+|   |   |   |-- notification_service.py
+|   |   |   |-- player_manager.py
+|   |   |   |-- port_manager.py
+|   |   |   |-- query_protocol.py
+|   |   |   |-- rcon_client.py
+|   |   |   |-- resource_monitor.py
+|   |   |   |-- server_detector.py
+|   |   |   |-- server_manager.py
+|   |   |   |-- server_templates.py
+|   |   |   |-- server_updater.py
+|   |   |   |-- settings_service.py
+|   |   |   |-- sftp_server.py
+|   |   |   |-- status_service.py
+|   |   |   |-- steamcmd.py
+|   |   |   |-- task_scheduler.py
+|   |   |   |-- update_checker.py
+|   |   |   |-- version_cache.py
+|   |   |   |-- webauthn_service.py
+|   |   |   |-- world_manager.py
+|   |   |
+|   |   |-- static/               # Static assets
+|   |   |   |-- css/              # Compiled Tailwind CSS
+|   |   |   |-- js/               # Client-side JavaScript
+|   |   |   |-- icons/            # App icons
+|   |   |   |-- manifest.json     # PWA manifest
+|   |   |   |-- offline.html      # PWA offline fallback
+|   |   |
+|   |   |-- templates/            # 26 Jinja2 HTML templates
+|   |       |-- base.html         # Base layout (dark theme, nav, i18n)
+|   |       |-- ...
+|   |
+|   |-- tests/                    # unittest-style + pytest test suite
+|   |
+|   |-- translations/             # i18n translation files
+|       |-- de/                   # German translations
+|       |-- en/                   # English translations
+|
+|-- data/                         # Runtime data (backups, logs, DB)
+|   |-- backups/                  # Server backup archives
 |
 |-- servers/                      # Game server installation directories (gitignored)
-|
-|-- translations/                 # i18n translation files
-    |-- de/                       # German translations
-    |-- en/                       # English translations
 ```
 
 ---

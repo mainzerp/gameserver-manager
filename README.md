@@ -144,15 +144,21 @@ python -m venv .venv
 .venv\Scripts\activate           # Windows
 # source .venv/bin/activate      # Linux/Mac
 
-pip install -r requirements.txt
+pip install -r gsm/requirements.txt
 
 cp .env.example .env
 # Edit .env -- set GSM_DATABASE_URL and GSM_SECRET_KEY
 
 # Run database migrations
+cd gsm
 alembic upgrade head
 
+# Build CSS (when Tailwind classes changed)
+cd gsm
+npm run css:build
+
 # Start the application
+cd gsm
 python main.py
 ```
 

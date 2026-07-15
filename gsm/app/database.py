@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -32,10 +34,12 @@ async def init_db():
     import asyncio
     import functools
 
-    from alembic import command
     from alembic.config import Config
 
-    alembic_cfg = Config("alembic.ini")
+    from alembic import command
+
+    _alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
+    alembic_cfg = Config(str(_alembic_ini))
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(
         None, functools.partial(command.upgrade, alembic_cfg, "head")

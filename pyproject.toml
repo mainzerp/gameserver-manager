@@ -4,19 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gameserver-manager"
-version = "2.6.2"
+version = "2.12.0"
 requires-python = ">=3.12"
 
 [project.optional-dependencies]
 dev = ["ruff>=0.8.0", "pytest>=8.0.0", "pytest-asyncio>=0.24.0"]
 
 [tool.setuptools.packages.find]
+where = ["gsm"]
 include = ["app*"]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-src = ["app", "main.py"]
+src = ["gsm"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "C901"]
@@ -26,23 +27,24 @@ max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 # Legacy high-complexity functions; refactor in future phase
-"app/services/server_manager.py" = ["C901"]
-"app/services/mod_updater.py" = ["C901"]
-"app/services/modpack_importer.py" = ["C901"]
-"app/services/notification_service.py" = ["C901"]
-"app/services/task_scheduler.py" = ["C901"]
-"app/services/server_updater.py" = ["C901"]
-"app/services/steamcmd.py" = ["C901"]
-"app/services/java_manager.py" = ["C901"]
-"app/services/server_detector.py" = ["C901"]
-"app/routers/servers/server_core.py" = ["C901"]
-"app/routers/servers/server_crud.py" = ["C901"]
-"app/routers/servers/server_misc.py" = ["C901"]
-"app/models/__init__.py" = ["F401"]
+"gsm/app/services/server_manager.py" = ["C901"]
+"gsm/app/services/mod_updater.py" = ["C901"]
+"gsm/app/services/modpack_importer.py" = ["C901"]
+"gsm/app/services/notification_service.py" = ["C901"]
+"gsm/app/services/task_scheduler.py" = ["C901"]
+"gsm/app/services/server_updater.py" = ["C901"]
+"gsm/app/services/steamcmd.py" = ["C901"]
+"gsm/app/services/java_manager.py" = ["C901"]
+"gsm/app/services/server_detector.py" = ["C901"]
+"gsm/app/routers/servers/server_core.py" = ["C901"]
+"gsm/app/routers/servers/server_crud.py" = ["C901"]
+"gsm/app/routers/servers/server_misc.py" = ["C901"]
+"gsm/app/models/__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["gsm/tests"]
+pythonpath = ["gsm"]

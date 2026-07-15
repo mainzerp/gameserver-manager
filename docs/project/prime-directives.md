@@ -16,7 +16,7 @@ These rules define what the codebase must enforce at runtime. They are non-negot
 
 - Use **Conventional Commits** for all commit messages.
 - Do **not** use emojis in messages, docs, comments, commit messages, or UI text unless explicitly requested.
-- Run `ruff check app main.py` and `python -m pytest tests/ -q` before considering any task complete.
+- Run `ruff check gsm/app gsm/main.py` and `python -m pytest gsm/tests/ -q` before considering any task complete.
 - Follow the existing project structure and naming conventions.
 - Prefer async I/O for all database and network operations.
 

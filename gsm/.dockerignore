@@ -13,15 +13,16 @@ env/
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # Environment
 .env
 
-# Database
+# Database / runtime data (kept at repo root, not in build context)
 data/*.db
-
-# Server files
 servers/
+screenshots/
 
 # Node.js
 node_modules/
@@ -34,13 +35,7 @@ Thumbs.db
 .git/
 .gitignore
 
-# Agent docs
-docs/SubAgent/
-./kilo
-AGENTS.md
-
 # Test artifacts
-admin-test-user.md
-
-# ZIP files in project root (test uploads etc.)
 *.zip
+.pytest_cache/
+.ruff_cache/

@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app import __version__
 
+_APP_ROOT = Path(__file__).resolve().parent.parent
+
 
 class Settings(BaseSettings):
     app_name: str = "GameServer Manager"
@@ -13,12 +15,10 @@ class Settings(BaseSettings):
     port: int = 8443
     # SQLite alternative: "sqlite+aiosqlite:///./data/gameserver.db"
     database_url: str = "postgresql+asyncpg://gsm:gsm@db:5432/gameserver"
-    servers_dir: str = str(Path(__file__).resolve().parent.parent / "servers")
+    servers_dir: str = str(_APP_ROOT / "servers")
     steamcmd_path: str = ""
     steamcmd_auto_install: bool = True
-    steamcmd_install_dir: str = str(
-        Path(__file__).resolve().parent.parent / "data" / "steamcmd"
-    )
+    steamcmd_install_dir: str = str(_APP_ROOT / "data" / "steamcmd")
     steam_api_key: str = ""
     modrinth_api_url: str = "https://api.modrinth.com/v2"
     mod_check_interval_minutes: int = 60
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 50
     max_extract_size_gb: int = 20
     max_extract_files: int = 10000
-    backup_dir: str = str(Path(__file__).resolve().parent.parent / "data" / "backups")
+    backup_dir: str = str(_APP_ROOT / "data" / "backups")
     max_backups_per_server: int = 10
     discord_webhook_url: str = ""
     discord_notify_events: str = "start,stop,crash,backup"
@@ -52,9 +52,7 @@ class Settings(BaseSettings):
     update_check_interval_hours: int = 24
     sftp_enabled: bool = False
     sftp_port: int = 2222
-    sftp_host_key_path: str = str(
-        Path(__file__).resolve().parent.parent / "data" / "sftp_host_key"
-    )
+    sftp_host_key_path: str = str(_APP_ROOT / "data" / "sftp_host_key")
     docker_isolation_enabled: bool = False
     docker_default_image: str = "eclipse-temurin:21-jre"
     docker_network_mode: str = "host"
@@ -91,5 +89,5 @@ settings = Settings()
 
 # Ensure directories exist
 os.makedirs(settings.servers_dir, exist_ok=True)
-os.makedirs("data", exist_ok=True)
+os.makedirs(_APP_ROOT / "data", exist_ok=True)
 os.makedirs(settings.backup_dir, exist_ok=True)
