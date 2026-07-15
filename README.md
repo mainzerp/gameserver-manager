@@ -1,5 +1,10 @@
 # GameServer Manager
 
+![Quality](https://img.shields.io/github/actions/workflow/status/mainzerp/gameserver/ci.yml?branch=main&job=quality&label=Quality&logo=github)
+![Security](https://img.shields.io/github/actions/workflow/status/mainzerp/gameserver/ci.yml?branch=main&job=security&label=Security&logo=github)
+![Docker Build](https://img.shields.io/github/actions/workflow/status/mainzerp/gameserver/ci.yml?branch=main&job=docker&label=Docker%20Build&logo=github)
+![Release](https://img.shields.io/github/actions/workflow/status/mainzerp/gameserver/release.yml?branch=main&job=release&label=Release&logo=github)
+
 A web-based game server management panel for Minecraft (Java/Bedrock) and Steam game servers. Built with Python 3.12 and FastAPI, featuring real-time WebSocket consoles, automatic mod management, and a modern dark-theme UI.
 
 ## Features

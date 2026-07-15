@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  lint-test:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,3 +43,38 @@ jobs:
           GSM_SECRET_KEY="ci-test-key-not-for-prod" \
           GSM_DATABASE_URL="sqlite:///./ci_migrate_check.db" \
           python -c "import asyncio; from app.database import init_db; asyncio.run(init_db())"
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install security tools
+        run: pip install bandit pip-audit
+
+      - name: Bandit scan
+        run: bandit -r app -ll -ii || true
+
+      - name: Dependency audit
+        run: pip-audit -r requirements.txt || true
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
