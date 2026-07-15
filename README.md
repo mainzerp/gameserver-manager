@@ -2,7 +2,7 @@
   <img src="docs/logo.svg" alt="GameServer Manager Logo" width="160">
 </p>
 
-# GameServer Manager
+<h1 align="center"><font color="#c4923f">GameServer Manager</font></h1>
 
 ![Quality](https://img.shields.io/github/actions/workflow/status/mainzerp/gameserver-manager/ci.yml?branch=main&job=quality&label=Quality&logo=github)
 ![Security](https://img.shields.io/github/actions/workflow/status/mainzerp/gameserver-manager/ci.yml?branch=main&job=security&label=Security&logo=github)
