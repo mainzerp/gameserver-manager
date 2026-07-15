@@ -2,11 +2,11 @@
 
 > **NOTE:** This file contains instructions for the coding agent (Kilo/Orchestrator) and is **not part of the GameServer Manager application**. It does not define app behavior, runtime logic, or user-facing functionality.
 >
-> **CRITICAL: If it exists, `.github/instructions/prime-directives.md` contains project-specific architectural and correctness rules. They define what the codebase must enforce at runtime. Read and respect them when analyzing, changing, or implementing any part of this project. They are non-negotiable and override all other guidance.**
+> **CRITICAL: If it exists, `docs/project/prime-directives.md` contains project-specific architectural and correctness rules. They define what the codebase must enforce at runtime. Read and respect them when analyzing, changing, or implementing any part of this project. They are non-negotiable and override all other guidance.**
 >
-> **LEARNINGS: If it exists, read `.kimi/lessons.md` at the start of every session to recall accumulated context, lessons learned, and recurring patterns. Append new learnings to it before the session ends so they persist across conversations.**
+> **LEARNINGS: If it exists, read `docs/project/lessons.md` at the start of every session to recall accumulated context, lessons learned, and recurring patterns. Append new learnings to it before the session ends so they persist across conversations.**
 >
-> **PROJECT DEFINITION: `.github/instructions/project-definition.md` contains project information.**
+> **PROJECT DEFINITION: `docs/project/project-definition.md` contains project information.**
 
 ## Dependency Management
 
