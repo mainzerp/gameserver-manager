@@ -95,6 +95,16 @@ A web-based game server management panel for Minecraft (Java/Bedrock) and Steam 
 | httpx | Async HTTP client (Modrinth, CurseForge, JAR downloads) |
 | Docker | Containerization |
 
+## Screenshots
+
+| Login | Dashboard |
+|---|---|
+| ![Login](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
+| Servers List | Server Detail |
+|---|---|
+| ![Servers List](docs/screenshots/servers-list.png) | ![Server Detail](docs/screenshots/server-detail.png) |
+
 ## Quick Start
 
 ### Docker (Recommended)
@@ -112,7 +122,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The panel will be available at **https://localhost:8443**. On first launch, you will be guided through initial setup to create an admin account.
+The panel will be available at **https://localhost:8443** by default. Set `GSM_HOST_PORT` in `.env` to use a different host port (for example, `GSM_HOST_PORT=9000`).
 
 The Docker image includes Java 8, 17, 21, and 25 for Minecraft server compatibility.
 
