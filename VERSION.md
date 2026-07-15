@@ -1,6 +1,21 @@
 # Version History
 
-## Current Version: 2.11.0
+## Current Version: 2.12.0
+
+### v2.12.0 -- Live Telemetry, Query Defaults and Container Release
+
+**Added:**
+- Live player telemetry for Steam (A2S) and Minecraft Java (SLP) servers.
+- `/servers/{id}/telemetry` endpoint and UI player count on the server list and server detail pages.
+- UI screenshots in `docs/screenshots/` for README documentation.
+- GitHub Actions release workflow that builds and publishes a Docker image to `ghcr.io` on `v*` tag pushes.
+
+**Changed:**
+- Minecraft Java servers now enable `enable-query` and set `query.port` to the game port by default.
+- README Quick Start now documents the `GSM_HOST_PORT` environment variable for overriding the host port.
+
+**Fixed:**
+- `.gitignore` scoping so `app/routers/servers/` is tracked correctly.
 
 ### v2.11.0 -- Header Removal and Preferences Page
 
