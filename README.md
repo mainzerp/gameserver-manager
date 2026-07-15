@@ -135,6 +135,33 @@ The panel will be available at **https://localhost:8443** by default. Set `GSM_H
 
 The Docker image includes Java 8, 17, 21, and 25 for Minecraft server compatibility.
 
+### Testing with Docker
+
+```bash
+# Generate .env.test with strong secrets
+python -c "import secrets; print('GSM_SECRET_KEY=' + secrets.token_hex(32)); print('POSTGRES_PASSWORD=' + secrets.token_hex(32))" > .env.test
+{
+  echo "GSM_HOST_PORT_TEST=8444"
+  echo "POSTGRES_DB=gameserver"
+  echo "POSTGRES_USER=gsm"
+} >> .env.test
+
+# Build and start the test database
+docker compose --env-file .env.test -f docker-compose.test.yml up -d db-test
+
+# Run migrations
+docker compose --env-file .env.test -f docker-compose.test.yml run --rm gameserver-manager-test alembic upgrade head
+
+# Start the test app
+docker compose --env-file .env.test -f docker-compose.test.yml up -d gameserver-manager-test
+```
+
+The test panel is available at **https://localhost:8444** by default (set `GSM_HOST_PORT_TEST` in `.env.test` to use a different port). The test stack uses isolated named volumes and a separate network so it does not interfere with the production stack. Tear it down with:
+
+```bash
+docker compose --env-file .env.test -f docker-compose.test.yml down -v
+```
+
 ### Local Development
 
 ```bash

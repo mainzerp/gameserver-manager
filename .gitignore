@@ -26,6 +26,12 @@ data/
 certs/
 logs/
 
+# Runtime directories (also inside gsm/ for local dev)
+/gsm/data/
+/gsm/servers/
+/gsm/certs/
+/gsm/logs/
+
 # Archives
 *.zip
 

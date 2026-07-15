@@ -1,0 +1,63 @@
+services:
+  gameserver-manager-test:
+    build: ./gsm
+    container_name: gameserver_manager_test
+    restart: "no"
+    ports:
+      - "${GSM_HOST_PORT_TEST:-8444}:8443"
+    environment:
+      - TZ=UTC
+      - GSM_DEBUG=true
+      - GSM_SECRET_KEY=${GSM_SECRET_KEY:-test-secret-key-not-for-production}
+      - PYTHONUNBUFFERED=1
+      - GSM_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-gsm}:${POSTGRES_PASSWORD:-gsm}@db-test:5432/${POSTGRES_DB:-gameserver}
+      - GSM_SSL_ENABLED=true
+      - GSM_SSL_CERTFILE=/app/certs/cert.pem
+      - GSM_SSL_KEYFILE=/app/certs/key.pem
+      - GSM_STEAMCMD_PATH=/opt/steamcmd/steamcmd.sh
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:8443/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    volumes:
+      - gsm_test_data:/app/data
+      - gsm_test_servers:/app/servers
+      - gsm_test_certs:/app/certs
+      - gsm_test_steamcmd:/opt/steamcmd
+    depends_on:
+      db-test:
+        condition: service_healthy
+    networks:
+      - gsm_test
+    command: ["/bin/sh", "-c", "alembic upgrade head && exec python main.py"]
+
+  db-test:
+    image: postgres:17-alpine
+    container_name: gsm_postgres_test
+    restart: "no"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gameserver}
+      POSTGRES_USER: ${POSTGRES_USER:-gsm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gsm}
+    volumes:
+      - pg_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gsm} -d ${POSTGRES_DB:-gameserver}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gsm_test
+
+volumes:
+  gsm_test_data:
+  gsm_test_servers:
+  gsm_test_certs:
+  gsm_test_steamcmd:
+  pg_test_data:
+
+networks:
+  gsm_test:
+    name: gameserver_test
