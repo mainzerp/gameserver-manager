@@ -1,22 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Setup Two-Factor Authentication{% endblock %}
-
-{% block breadcrumb %}
-<a href="/" style="color: var(--clr-text-muted);" class="hover:underline">Security</a>
-<span style="color: var(--clr-text-muted);"> / </span>
-<span style="color: var(--clr-text-primary);">2FA Setup</span>
-{% endblock %}
+{% block title %}{{ _("Security") }}{% endblock %}
 
 {% block content %}
 <div class="max-w-lg mx-auto">
-    <h1 class="text-2xl font-bold mb-6" style="color: var(--clr-text-primary);">Setup Two-Factor Authentication</h1>
+    <h1 class="text-2xl font-bold mb-6" style="color: var(--clr-text-primary);">{{ _("Security") }}</h1>
 
     {% if recovery_codes %}
     <div class="card p-6">
-        <h2 class="font-semibold mb-4" style="color: var(--clr-success);">2FA Enabled Successfully</h2>
+        <h2 class="font-semibold mb-4" style="color: var(--clr-success);">{{ _("2FA Enabled Successfully") }}</h2>
         <p class="text-sm mb-4" style="color: var(--clr-text-secondary);">
-            Save these recovery codes in a safe place. Each code can only be used once.
-            If you lose access to your authenticator app, you can use these codes to log in.
+            {{ _("Save these recovery codes in a safe place. Each code can only be used once. If you lose access to your authenticator app, you can use these codes to log in.") }}
         </p>
         <div class="rounded-lg p-4 font-mono text-sm space-y-1 mb-4" style="background: var(--clr-input); color: var(--clr-text-primary);">
             {% for code in recovery_codes %}
@@ -25,16 +18,37 @@
         </div>
         <button id="copy-totp-codes-btn"
                 data-codes="{{ recovery_codes | join('\n') }}"
+                data-label-copy="{{ _("Copy All Codes") }}"
+                data-label-copied="{{ _("Copied!") }}"
                 class="btn btn-primary">
-            Copy All Codes
+            {{ _("Copy All Codes") }}
         </button>
-        <a href="/" class="ml-4 text-sm transition" style="color: var(--clr-text-muted);">Back to Dashboard</a>
+        <a href="/" class="ml-4 text-sm transition" style="color: var(--clr-text-muted);">{{ _("Back to Dashboard") }}</a>
+    </div>
+    {% elif totp_enabled %}
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold" style="color: var(--clr-text-primary);">{{ _("Two-Factor Authentication") }}</h2>
+            <span class="badge badge-success">{{ _("2FA is set up") }}</span>
+        </div>
+        <p class="text-sm mb-6" style="color: var(--clr-text-secondary);">
+            {{ _("Two-factor authentication is currently protecting your account.") }}
+        </p>
+        <form action="/settings/2fa/disable" method="post">
+            {{ csrf_field(request) }}
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="password">{{ _("Confirm your password") }}</label>
+                <input type="password" id="password" name="password" required
+                    class="input-field" autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-danger w-full">{{ _("Deactivate 2FA") }}</button>
+        </form>
     </div>
     {% else %}
     <div class="card p-6">
+        <h2 class="font-semibold mb-4" style="color: var(--clr-text-primary);">{{ _("Setup Two-Factor Authentication") }}</h2>
         <p class="text-sm mb-6" style="color: var(--clr-text-secondary);">
-            Scan the QR code below with your authenticator app (Google Authenticator, Authy, etc.),
-            then enter the 6-digit verification code to enable 2FA.
+            {{ _("Scan the QR code below with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit verification code to enable 2FA.") }}
         </p>
 
         <div class="flex justify-center mb-6">
@@ -42,7 +56,7 @@
         </div>
 
         <div class="mb-6">
-            <p class="text-xs mb-1" style="color: var(--clr-text-muted);">Manual entry key:</p>
+            <p class="text-xs mb-1" style="color: var(--clr-text-muted);">{{ _("Manual entry key:") }}</p>
             <code class="px-3 py-2 rounded text-sm block break-all" style="background: var(--clr-input); color: var(--clr-accent);">{{ secret }}</code>
         </div>
 
@@ -55,7 +69,7 @@
         <form action="/settings/2fa/setup" method="post">
             {{ csrf_field(request) }}
             <div class="mb-4">
-                <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="code">Verification Code</label>
+                <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="code">{{ _("Verification Code") }}</label>
                 <input type="text" id="code" name="code" required
                     maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code"
                     class="input-field"
@@ -63,7 +77,7 @@
             </div>
             <button type="submit"
                 class="btn w-full py-3 text-sm font-medium" style="background: var(--clr-success); color: #ffffff;">
-                Enable 2FA
+                {{ _("Enable 2FA") }}
             </button>
         </form>
     </div>
@@ -78,9 +92,9 @@
     if (btn) {
         btn.addEventListener('click', function() {
             navigator.clipboard.writeText(btn.dataset.codes).then(function() {
-                btn.textContent = 'Copied!';
+                btn.textContent = btn.dataset.labelCopied;
                 setTimeout(function() {
-                    btn.textContent = 'Copy All Codes';
+                    btn.textContent = btn.dataset.labelCopy;
                 }, 2000);
             });
         });

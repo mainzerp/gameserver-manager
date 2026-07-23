@@ -209,3 +209,90 @@ msgstr "Steam account added"
 
 msgid "Steam account deleted"
 msgstr "Steam account deleted"
+
+msgid "Initial Setup"
+msgstr "Initial Setup"
+
+msgid "Welcome! Create your administrator account to get started."
+msgstr "Welcome! Create your administrator account to get started."
+
+msgid "Confirm Password"
+msgstr "Confirm Password"
+
+msgid "Create Account"
+msgstr "Create Account"
+
+msgid "Two-Factor Verification"
+msgstr "Two-Factor Verification"
+
+msgid "Enter the 6-digit code from your authenticator app."
+msgstr "Enter the 6-digit code from your authenticator app."
+
+msgid "Authentication Code"
+msgstr "Authentication Code"
+
+msgid "Recovery Code"
+msgstr "Recovery Code"
+
+msgid "Verify"
+msgstr "Verify"
+
+msgid "Use recovery code instead"
+msgstr "Use recovery code instead"
+
+msgid "Use authenticator code instead"
+msgstr "Use authenticator code instead"
+
+msgid "Back to login"
+msgstr "Back to login"
+
+msgid "Security"
+msgstr "Security"
+
+msgid "Two-Factor Authentication"
+msgstr "Two-Factor Authentication"
+
+msgid "2FA is set up"
+msgstr "2FA is set up"
+
+msgid "Two-factor authentication is currently protecting your account."
+msgstr "Two-factor authentication is currently protecting your account."
+
+msgid "Confirm your password"
+msgstr "Confirm your password"
+
+msgid "Deactivate 2FA"
+msgstr "Deactivate 2FA"
+
+msgid "Setup Two-Factor Authentication"
+msgstr "Setup Two-Factor Authentication"
+
+msgid "2FA Enabled Successfully"
+msgstr "2FA Enabled Successfully"
+
+msgid "Save these recovery codes in a safe place. Each code can only be used once. If you lose access to your authenticator app, you can use these codes to log in."
+msgstr "Save these recovery codes in a safe place. Each code can only be used once. If you lose access to your authenticator app, you can use these codes to log in."
+
+msgid "Copy All Codes"
+msgstr "Copy All Codes"
+
+msgid "Copied!"
+msgstr "Copied!"
+
+msgid "Back to Dashboard"
+msgstr "Back to Dashboard"
+
+msgid "Scan the QR code below with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit verification code to enable 2FA."
+msgstr "Scan the QR code below with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit verification code to enable 2FA."
+
+msgid "Manual entry key:"
+msgstr "Manual entry key:"
+
+msgid "Verification Code"
+msgstr "Verification Code"
+
+msgid "Enable 2FA"
+msgstr "Enable 2FA"
+
+msgid "This game requires an authenticated Steam account - anonymous install will fail."
+msgstr ""

@@ -209,3 +209,90 @@ msgstr "Steam-Konto hinzugefuegt"
 
 msgid "Steam account deleted"
 msgstr "Steam-Konto geloescht"
+
+msgid "Initial Setup"
+msgstr "Ersteinrichtung"
+
+msgid "Welcome! Create your administrator account to get started."
+msgstr "Willkommen! Erstellen Sie Ihr Administratorkonto, um zu beginnen."
+
+msgid "Confirm Password"
+msgstr "Passwort bestätigen"
+
+msgid "Create Account"
+msgstr "Konto erstellen"
+
+msgid "Two-Factor Verification"
+msgstr "Zwei-Faktor-Verifizierung"
+
+msgid "Enter the 6-digit code from your authenticator app."
+msgstr "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein."
+
+msgid "Authentication Code"
+msgstr "Authentifizierungscode"
+
+msgid "Recovery Code"
+msgstr "Wiederherstellungscode"
+
+msgid "Verify"
+msgstr "Verifizieren"
+
+msgid "Use recovery code instead"
+msgstr "Stattdessen Wiederherstellungscode verwenden"
+
+msgid "Use authenticator code instead"
+msgstr "Stattdessen Authenticator-Code verwenden"
+
+msgid "Back to login"
+msgstr "Zurück zur Anmeldung"
+
+msgid "Security"
+msgstr "Sicherheit"
+
+msgid "Two-Factor Authentication"
+msgstr "Zwei-Faktor-Authentifizierung"
+
+msgid "2FA is set up"
+msgstr "2FA ist eingerichtet"
+
+msgid "Two-factor authentication is currently protecting your account."
+msgstr "Die Zwei-Faktor-Authentifizierung schützt derzeit Ihr Konto."
+
+msgid "Confirm your password"
+msgstr "Bestätigen Sie Ihr Passwort"
+
+msgid "Deactivate 2FA"
+msgstr "2FA deaktivieren"
+
+msgid "Setup Two-Factor Authentication"
+msgstr "Zwei-Faktor-Authentifizierung einrichten"
+
+msgid "2FA Enabled Successfully"
+msgstr "2FA erfolgreich aktiviert"
+
+msgid "Save these recovery codes in a safe place. Each code can only be used once. If you lose access to your authenticator app, you can use these codes to log in."
+msgstr "Bewahren Sie diese Wiederherstellungscodes an einem sicheren Ort auf. Jeder Code kann nur einmal verwendet werden. Wenn Sie den Zugriff auf Ihre Authenticator-App verlieren, können Sie sich mit diesen Codes anmelden."
+
+msgid "Copy All Codes"
+msgstr "Alle Codes kopieren"
+
+msgid "Copied!"
+msgstr "Kopiert!"
+
+msgid "Back to Dashboard"
+msgstr "Zurück zum Dashboard"
+
+msgid "Scan the QR code below with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit verification code to enable 2FA."
+msgstr "Scannen Sie den untenstehenden QR-Code mit Ihrer Authenticator-App (Google Authenticator, Authy usw.) und geben Sie dann den 6-stelligen Verifizierungscode ein, um 2FA zu aktivieren."
+
+msgid "Manual entry key:"
+msgstr "Manueller Eintragsschlüssel:"
+
+msgid "Verification Code"
+msgstr "Verifizierungscode"
+
+msgid "Enable 2FA"
+msgstr "2FA aktivieren"
+
+msgid "This game requires an authenticated Steam account - anonymous install will fail."
+msgstr "Dieses Spiel erfordert ein authentifiziertes Steam-Konto - die anonyme Installation schlägt fehl."

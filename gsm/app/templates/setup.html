@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Initial Setup - GameServer Manager</title>
+    <title>{{ _("Initial Setup") }} - GameServer Manager</title>
     <script nonce="{{ request.state.csp_nonce }}">
         (function(){
             var t = localStorage.getItem('gsm_theme');
@@ -15,49 +15,112 @@
     <!-- Tailwind CSS (compiled) -->
     <link rel="stylesheet" href="/static/css/tailwind.css">
     <style>
+        /* ===== CSS Custom Properties: Light Mode ===== */
         :root {
-            --clr-bg: #f1f5f9;
+            --clr-bg: #f5f2ee;
             --clr-panel: #ffffff;
-            --clr-input: #f8fafc;
-            --clr-border: #e2e8f0;
-            --clr-text-primary: #0f172a;
-            --clr-text-secondary: #475569;
-            --clr-text-muted: #94a3b8;
-            --clr-accent: #6366f1;
-            --clr-accent-hover: #4f46e5;
-            --clr-danger: #dc2626;
-            --clr-danger-bg: rgba(220,38,38,0.1);
+            --clr-panel-hover: #f5f2ee;
+            --clr-input: #f5f2ee;
+            --clr-border: #d5d0ca;
+            --clr-border-hover: #c4923f;
+            --clr-text-primary: #1a1816;
+            --clr-text-secondary: #3d3935;
+            --clr-text-muted: #5a5550;
+            --clr-text-inverse: #0d0c0a;
+            --clr-accent: #c4923f;
+            --clr-accent-hover: #d4a045;
+            --clr-accent-subtle: rgba(196, 146, 63, 0.12);
+            --clr-accent-glow: rgba(196, 146, 63, 0.30);
+            --clr-danger: #b8635a;
+            --clr-danger-bg: rgba(184, 99, 90, 0.12);
             --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
             --radius-sm: 6px;
             --radius-md: 10px;
+            --radius-lg: 16px;
         }
+
         html.dark {
-            --clr-bg: #0c0c1d;
-            --clr-panel: #151530;
-            --clr-input: #0f0f23;
-            --clr-border: #252547;
-            --clr-text-primary: #e2e8f0;
-            --clr-text-secondary: #94a3b8;
-            --clr-text-muted: #64748b;
-            --clr-accent: #6366f1;
-            --clr-accent-hover: #818cf8;
-            --clr-danger: #ef4444;
-            --clr-danger-bg: rgba(239,68,68,0.12);
-            --transition-fast: 150ms ease;
-            --radius-sm: 6px;
-            --radius-md: 10px;
+            --clr-bg: #0d0c0a;
+            --clr-panel: #151512;
+            --clr-panel-hover: #1a1816;
+            --clr-input: #0d0c0a;
+            --clr-border: #2e2b28;
+            --clr-border-hover: #e2a84b;
+            --clr-text-primary: #f5f2ee;
+            --clr-text-secondary: #d5d0ca;
+            --clr-text-muted: #8a8580;
+            --clr-text-inverse: #0d0c0a;
+            --clr-accent: #e2a84b;
+            --clr-accent-hover: #f5c26b;
+            --clr-accent-subtle: rgba(226, 168, 75, 0.12);
+            --clr-accent-glow: rgba(226, 168, 75, 0.35);
+            --clr-danger: #d4756b;
+            --clr-danger-bg: rgba(212, 117, 107, 0.12);
         }
+
+        * {
+            transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+
         body {
             font-family: 'Inter', system-ui, sans-serif;
             color: var(--clr-text-primary);
-            background: linear-gradient(135deg, var(--clr-bg) 0%, var(--clr-panel) 50%, var(--clr-bg) 100%);
+            background: var(--clr-bg);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
         }
-        * { transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast); }
-        .card {
+
+        /* Atmospheric background grid */
+        .login-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 30% 20%, var(--clr-accent-subtle) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(143, 180, 204, 0.06) 0%, transparent 35%),
+                linear-gradient(180deg, var(--clr-bg) 0%, var(--clr-panel-hover) 100%);
+        }
+
+        html.dark .login-bg {
+            background:
+                radial-gradient(circle at 30% 20%, rgba(226, 168, 75, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(143, 180, 204, 0.04) 0%, transparent 35%),
+                linear-gradient(180deg, #0d0c0a 0%, #12110f 100%);
+        }
+
+        .login-grid {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(var(--clr-border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--clr-border) 1px, transparent 1px);
+            background-size: 60px 60px;
+            opacity: 0.15;
+            mask-image: radial-gradient(circle at center, black 0%, transparent 75%);
+            -webkit-mask-image: radial-gradient(circle at center, black 0%, transparent 75%);
+        }
+
+        /* Card */
+        .login-card {
             background: var(--clr-panel);
             border: 1px solid var(--clr-border);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
         }
+
+        html.dark .login-card {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+        }
+
+        .login-card:hover {
+            border-color: var(--clr-border-hover);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 0 24px var(--clr-accent-glow);
+        }
+
+        /* Inputs */
         .input-field {
             background: var(--clr-input);
             border: 1px solid var(--clr-border);
@@ -67,63 +130,131 @@
             color: var(--clr-text-primary);
             outline: none;
             width: 100%;
-            transition: border-color var(--transition-fast);
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
         }
-        .input-field:focus { border-color: var(--clr-accent); }
+
+        .input-field:focus {
+            border-color: var(--clr-accent);
+            box-shadow: 0 0 0 3px var(--clr-accent-subtle);
+        }
+
         .input-field::placeholder { color: var(--clr-text-muted); }
+
+        .input-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+            color: var(--clr-text-secondary);
+        }
+
+        /* Buttons */
         .btn-primary {
             background: var(--clr-accent);
-            color: #ffffff;
+            color: var(--clr-text-inverse);
             padding: 10px 16px;
             border-radius: var(--radius-sm);
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
             border: none;
             transition: all var(--transition-fast);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
         }
-        .btn-primary:hover { background: var(--clr-accent-hover); }
+
+        .btn-primary:hover {
+            background: var(--clr-accent-hover);
+            box-shadow: 0 0 16px var(--clr-accent-glow);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--clr-border);
+            color: var(--clr-text-secondary);
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--clr-accent);
+            background: var(--clr-accent-subtle);
+            color: var(--clr-accent);
+        }
+
+        .brand-glow {
+            filter: drop-shadow(0 0 8px var(--clr-accent-glow));
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center">
-    <div class="w-full max-w-sm">
+<body class="min-h-screen flex items-center justify-center px-4">
+    <div class="login-bg">
+        <div class="login-grid"></div>
+    </div>
+
+    <div class="w-full max-w-sm animate-fade-in">
         <div class="text-center mb-8">
-            <svg class="w-12 h-12 mx-auto mb-3" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-12 h-12 mx-auto mb-3 brand-glow" style="color: var(--clr-accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 0 00-2-2m-2-4h.01M17 16h.01"/>
             </svg>
-            <h1 class="text-2xl font-bold" style="color: var(--clr-accent);">GameServer Manager</h1>
-            <p class="text-sm mt-2" style="color: var(--clr-text-muted);">Welcome! Create your administrator account to get started.</p>
+            <h1 class="text-2xl font-bold tracking-tight" style="color: var(--clr-text-primary);">GameServer Manager</h1>
+            <p class="text-sm mt-1" style="color: var(--clr-text-muted);">{{ _("Welcome! Create your administrator account to get started.") }}</p>
         </div>
 
-        <div class="card p-6">
+        <div class="login-card p-6">
             {% if error %}
-            <div class="text-sm rounded-lg px-4 py-3 mb-4" style="background: var(--clr-danger-bg); color: var(--clr-danger);">
+            <div class="text-sm rounded-lg px-4 py-3 mb-4 animate-fade-in" style="background: var(--clr-danger-bg); color: var(--clr-danger); border: 1px solid rgba(212, 117, 107, 0.25);">
                 {{ error }}
             </div>
             {% endif %}
 
             <form action="/setup" method="post" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="username">Username</label>
+                    <label class="input-label" for="username">{{ _("Username") }}</label>
                     <input type="text" id="username" name="username" required autofocus
                         class="input-field"
                         minlength="3" maxlength="50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="password">Password</label>
+                    <label class="input-label" for="password">{{ _("Password") }}</label>
                     <input type="password" id="password" name="password" required
                         class="input-field"
                         minlength="8">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-2" style="color: var(--clr-text-primary);" for="password_confirm">Confirm Password</label>
+                    <label class="input-label" for="password_confirm">{{ _("Confirm Password") }}</label>
                     <input type="password" id="password_confirm" name="password_confirm" required
                         class="input-field"
                         minlength="8">
                 </div>
                 <button type="submit" class="btn-primary w-full">
-                    Create Account
+                    {{ _("Create Account") }}
                 </button>
             </form>
         </div>

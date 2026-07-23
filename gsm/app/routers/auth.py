@@ -243,6 +243,15 @@ async def totp_setup_page(request: Request):
     import qrcode
 
     user = await get_current_user(request)
+    if user.totp_enabled:
+        request.session.pop("pending_totp_secret", None)
+        return templates.TemplateResponse(request, "totp_setup.html", {
+                "totp_enabled": True,
+                "qr_b64": "",
+                "secret": "",
+                "error": "",
+                "recovery_codes": None,
+            })
     secret = generate_totp_secret()
     uri = get_totp_uri(secret, user.username)
     img = qrcode.make(uri)
@@ -251,6 +260,7 @@ async def totp_setup_page(request: Request):
     qr_b64 = base64.b64encode(buf.getvalue()).decode()
     request.session["pending_totp_secret"] = secret
     return templates.TemplateResponse(request, "totp_setup.html", {
+            "totp_enabled": False,
             "qr_b64": qr_b64,
             "secret": secret,
             "error": "",
@@ -278,6 +288,7 @@ async def totp_setup_confirm(
         img.save(buf, format="PNG")
         qr_b64 = base64.b64encode(buf.getvalue()).decode()
         return templates.TemplateResponse(request, "totp_setup.html", {
+                "totp_enabled": False,
                 "qr_b64": qr_b64,
                 "secret": secret,
                 "error": "Invalid code. Please try again.",
@@ -297,6 +308,7 @@ async def totp_setup_confirm(
     audit_service.create_task(audit_service.log(**ctx, action="auth.2fa_enabled"))
 
     return templates.TemplateResponse(request, "totp_setup.html", {
+            "totp_enabled": True,
             "qr_b64": "",
             "secret": "",
             "error": "",
