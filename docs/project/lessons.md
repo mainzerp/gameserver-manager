@@ -36,3 +36,33 @@ Append new learnings at the end of each session so they persist across conversat
   - `docs/project/prime-directives.md`
   - `docs/project/lessons.md`
   - `docs/project/project-definition.md`
+
+## Session 2026-07-23
+
+### UI / Templates
+
+- Standalone (pre-auth) pages do NOT share a CSS file: `login.html`, `setup.html`, `status.html` each carry their own full inline `<style>` block with the design tokens. Restyling one means copying the block; extracting shared static CSS would deviate from the established pattern.
+- `base.html`'s global `data-action` click delegation only exists inside the app shell; standalone pages must attach their own `addEventListener` handlers inside a `nonce="{{ request.state.csp_nonce }}"` script.
+- `base.html` defines only `title`, `head`, `content`, `scripts` Jinja blocks; templates that declare `{% block breadcrumb %}` render it nowhere (dead markup).
+- The sidebar in `base.html` renders unconditionally, so any template extending `base.html` during a pre-auth or pending-2FA session shows a broken shell (use a standalone template instead).
+
+### 2FA
+
+- `POST /settings/2fa/disable` existed and was PRG-compliant long before any UI linked to it; the security page gained the enrolled-state deactivate form only in v2.12.2.
+- `GET /settings/2fa/setup` previously generated a fresh unpersisted TOTP secret/QR on every visit regardless of enrollment state; it now branches on `user.totp_enabled` and the template receives `totp_enabled` in every render context.
+
+### i18n
+
+- After editing `gsm/translations/*/LC_MESSAGES/messages.po`, the `.mo` files must be regenerated with `pybabel compile -d gsm/translations` (run from repo root) or new msgids silently render as English.
+- `docs/SubAgent/` artifacts are ephemeral (gitignored); verification commands: `ruff check gsm/app gsm/main.py` and `python -m pytest gsm/tests/ -q`.
+
+## Session 2026-07-23 (STEAM_AUTH_LOGIN)
+
+### Steam
+
+- `login_required` in `STEAM_APPS` was dead metadata since introduction (declared in all 12 entries, never consumed); it is now consumed by the create/edit form warnings via `data-login-required` option attributes.
+- `_run_process` failure messages keep their tail (`message[-400:]`), so a hint appended to the end of the message survives truncation; prepended hints would be cut off.
+- `_()` (gettext) is wired only for Jinja templates; Python service modules have no i18n infrastructure, so SteamCMD service strings (e.g. the install-failure hint) stay hardcoded English.
+- `get_remote_build_id_for_branch` was hard-coded to anonymous login, so update checks for auth-only apps (e.g. Palworld) failed silently; it now accepts optional credential kwargs (keyword-only) with anonymous defaults for backward compatibility.
+- `run_workshop_install` forwarded `login_anonymous`/`username`/`password` from `get_server_install_kwargs` but dropped `steam_guard_code`, losing TOTP pre-seeding on the workshop path.
+- Page-load-safe form defaults: `toggleFields()` on the create page calls `onSteamAppChange()` during `DOMContentLoaded`, so any auto-mutation of user fields (e.g. unchecking anonymous login) must live in a `change` event listener, not in the shared handler, or error re-renders lose repopulated `form_values`.

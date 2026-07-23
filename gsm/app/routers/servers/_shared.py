@@ -265,6 +265,7 @@ async def run_workshop_install(
             login_anonymous=steam_kwargs.get("login_anonymous", True),
             username=steam_kwargs.get("username"),
             password=steam_kwargs.get("password"),
+            steam_guard_code=steam_kwargs.get("steam_guard_code"),
             server_id=server_id,
             operation_type=operation_type,
             operation_id=operation_id,

@@ -310,7 +310,7 @@
                     class="input-field">
                     <option value="">Custom...</option>
                     {% for key, app in steam_apps.items() %}
-                    <option value="{{ app.app_id }}" data-port="{{ app.default_port }}">{{ app.name }} ({{ app.app_id }})</option>
+                    <option value="{{ app.app_id }}" data-port="{{ app.default_port }}" data-login-required="{{ '1' if app.login_required else '0' }}">{{ app.name }} ({{ app.app_id }})</option>
                     {% endfor %}
                 </select>
                 {% if not steamcmd_available %}
@@ -338,6 +338,10 @@
                     class="w-4 h-4 rounded border-dark-700 bg-dark-900 text-accent-600 focus:ring-accent-500">
                 <label class="text-sm font-medium" for="steam_login_anonymous">Anonymous Login</label>
                 <p class="text-xs" style="color: var(--clr-text-muted);">(sufficient for most game servers)</p>
+            </div>
+
+            <div id="steam-login-required-warning" class="mt-2 p-3 rounded-lg hidden" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+                <p class="text-xs" style="color: var(--clr-warning);">{{ _("This game requires an authenticated Steam account - anonymous install will fail.") }}</p>
             </div>
 
             <div class="mt-4" id="steam_account_section" style="display: none;">
@@ -487,6 +491,7 @@ function onSteamAppChange() {
     if (queryPortInput && !isNaN(gamePort)) {
         queryPortInput.value = gamePort + 1;
     }
+    toggleLoginRequiredWarning();
 }
 
 /* ---- MC Version dropdown ---- */
@@ -699,6 +704,19 @@ function toggleSteamAccountSection() {
     if (anonCheckbox && accountSection) {
         accountSection.style.display = anonCheckbox.checked ? 'none' : 'block';
     }
+    toggleLoginRequiredWarning();
+}
+
+function toggleLoginRequiredWarning() {
+    var warning = document.getElementById('steam-login-required-warning');
+    var select = document.getElementById('steam_app_id');
+    var anonCheckbox = document.getElementById('steam_login_anonymous');
+    if (!warning || !select || !anonCheckbox) {
+        return;
+    }
+    var opt = select.options[select.selectedIndex];
+    var required = opt && opt.getAttribute('data-login-required') === '1';
+    warning.classList.toggle('hidden', !(required && anonCheckbox.checked));
 }
 
 // Initialize on page load
@@ -707,6 +725,7 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleFields();
     toggleRcon();
     toggleSteamAccountSection();
+    toggleLoginRequiredWarning();
 
     // Attach event listeners (CSP-compliant, no inline handlers)
     var serverTypeEl = document.getElementById('server_type');
@@ -728,7 +747,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (propsBtn) { propsBtn.addEventListener('click', toggleServerProps); }
 
     var steamAppEl = document.getElementById('steam_app_id');
-    if (steamAppEl) { steamAppEl.addEventListener('change', onSteamAppChange); }
+    if (steamAppEl) {
+        steamAppEl.addEventListener('change', onSteamAppChange);
+        steamAppEl.addEventListener('change', function() {
+            var opt = this.options[this.selectedIndex];
+            if (opt && opt.getAttribute('data-login-required') === '1') {
+                var anonCheckbox = document.getElementById('steam_login_anonymous');
+                if (anonCheckbox && anonCheckbox.checked) {
+                    anonCheckbox.checked = false;
+                    toggleSteamAccountSection();
+                }
+            }
+        });
+    }
 
     var anonCb = document.getElementById('steam_login_anonymous');
     if (anonCb) { anonCb.addEventListener('change', toggleSteamAccountSection); }

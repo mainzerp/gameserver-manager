@@ -83,7 +83,7 @@ STEAM_APPS = {
         "executable": "PalServer.sh",
         "default_port": 8211,
         "start_args": "-port={port} -players=32 -queryport={query_port} EpicApp=PalServer -log",
-        "login_required": False,
+        "login_required": True,
         "workshop_supported": False,
         "config_files": ["Pal/Saved/Config/LinuxServer/PalWorldSettings.ini"],
     },
@@ -169,6 +169,15 @@ _STEAM_GUARD_INVALID_PATTERNS = (
     "incorrect steam guard code",
     "invalid auth code",
     "auth code invalid",
+)
+
+_MISSING_CONFIG_HINT = (
+    "Hint: this app may require an authenticated Steam account. "
+    "Assign one under server settings."
+)
+_INSTALL_FAILURE_HINTS = (
+    ("Missing configuration", _MISSING_CONFIG_HINT),
+    ("No subscription", _MISSING_CONFIG_HINT),
 )
 
 
@@ -558,6 +567,10 @@ class SteamCMD:
                     "\n".join(output_lines[-10:])
                     or f"SteamCMD exited with code {process.returncode}."
                 )
+                for needle, hint in _INSTALL_FAILURE_HINTS:
+                    if needle in message:
+                        message = f"{message}\n{hint}"
+                        break
                 return {
                     "ok": False,
                     "status": "failed",
@@ -837,14 +850,24 @@ class SteamCMD:
         return await self.get_remote_build_id_for_branch(app_id, "public")
 
     async def get_remote_build_id_for_branch(
-        self, app_id: str, branch: str | None = None
+        self,
+        app_id: str,
+        branch: str | None = None,
+        *,
+        login_anonymous: bool = True,
+        username: str | None = None,
+        password: str | None = None,
+        steam_guard_code: str | None = None,
     ) -> str | None:
         if not self.is_available:
             return None
+        login_scripts: list[str] = []
+        login_args = self._build_login_args(
+            login_anonymous, username, password, steam_guard_code, login_scripts
+        )
         cmd = [
             self._steamcmd_path,
-            "+login",
-            "anonymous",
+            *login_args,
             "+app_info_update",
             "1",
             "+app_info_print",
@@ -874,6 +897,12 @@ class SteamCMD:
                     break
         except Exception as exc:
             logger.error("Failed to get remote build ID for %s: %s", app_id, exc)
+        finally:
+            for _script in login_scripts:
+                try:
+                    os.remove(_script)
+                except OSError:
+                    pass
         return None
 
     async def get_account_credentials(self, db, account_id: int | None) -> dict:

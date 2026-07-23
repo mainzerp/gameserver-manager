@@ -25,7 +25,7 @@ class ServerUpdater:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    async def check_update(self, server: Server) -> dict | None:
+    async def check_update(self, server: Server, db: AsyncSession | None = None) -> dict | None:
         """Check if a server update is available.
 
         Returns {"current": str, "latest": str, "update_available": bool} or None.
@@ -61,9 +61,16 @@ class ServerUpdater:
         if server.server_type == ServerType.STEAM and server.steam_app_id:
             from app.services.steamcmd import steamcmd
 
+            creds = {}
+            if db is not None and not server.steam_login_anonymous and server.steam_account_id:
+                creds = await steamcmd.get_account_credentials(db, server.steam_account_id)
             remote_build_id = await steamcmd.get_remote_build_id_for_branch(
                 server.steam_app_id,
                 server.steam_branch or "public",
+                login_anonymous=not bool(creds),
+                username=creds.get("username"),
+                password=creds.get("password"),
+                steam_guard_code=creds.get("steam_guard_code"),
             )
             if not remote_build_id:
                 return None
@@ -223,7 +230,7 @@ class ServerUpdater:
                     server = await db.get(Server, sid)
                     if not server:
                         continue
-                    update_info = await self.check_update(server)
+                    update_info = await self.check_update(server, db)
                     if update_info and update_info.get("update_available"):
                         server.latest_known_version = update_info.get("latest")
                         await db.commit()

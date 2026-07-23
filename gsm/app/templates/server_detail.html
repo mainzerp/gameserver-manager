@@ -509,7 +509,7 @@
                         <select id="steam_app_id_edit" name="steam_app_id" class="input-field">
                             <option value="">Custom...</option>
                             {% for key, app in steam_apps.items() %}
-                            <option value="{{ app.app_id }}" {% if server.steam_app_id == app.app_id %}selected{% endif %}>{{ app.name }} ({{ app.app_id }})</option>
+                            <option value="{{ app.app_id }}" {% if server.steam_app_id == app.app_id %}selected{% endif %} data-login-required="{{ '1' if app.login_required else '0' }}">{{ app.name }} ({{ app.app_id }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -557,6 +557,9 @@
                         <input type="checkbox" name="steam_login_anonymous" value="true" {% if server.steam_login_anonymous %}checked{% endif %} class="w-4 h-4 rounded">
                         Anonymous Login
                     </label>
+                    <div id="steam-login-required-warning-edit" class="mt-2 p-3 rounded-lg hidden" style="background: var(--clr-warning-bg); border: 1px solid var(--clr-warning);">
+                        <p class="text-xs" style="color: var(--clr-warning);">{{ _("This game requires an authenticated Steam account - anonymous install will fail.") }}</p>
+                    </div>
                     <label class="flex items-center gap-2 text-sm">
                         <input type="hidden" name="steam_update_on_start" value="false">
                         <input type="checkbox" name="steam_update_on_start" value="true" {% if server.steam_update_on_start %}checked{% endif %} class="w-4 h-4 rounded">
@@ -2367,6 +2370,28 @@ function buildModCard(mod) {
                 error.classList.remove('hidden');
             });
     }
+
+    function toggleSteamEditLoginWarning() {
+        var warning = document.getElementById('steam-login-required-warning-edit');
+        var select = document.getElementById('steam_app_id_edit');
+        var anonCheckbox = document.querySelector('input[name="steam_login_anonymous"][type="checkbox"]');
+        if (!warning || !select || !anonCheckbox) {
+            return;
+        }
+        var opt = select.options[select.selectedIndex];
+        var required = opt && opt.getAttribute('data-login-required') === '1';
+        warning.classList.toggle('hidden', !(required && anonCheckbox.checked));
+    }
+
+    var editAppSelect = document.getElementById('steam_app_id_edit');
+    if (editAppSelect) {
+        editAppSelect.addEventListener('change', toggleSteamEditLoginWarning);
+    }
+    var editAnonCheckbox = document.querySelector('input[name="steam_login_anonymous"][type="checkbox"]');
+    if (editAnonCheckbox) {
+        editAnonCheckbox.addEventListener('change', toggleSteamEditLoginWarning);
+    }
+    document.addEventListener('DOMContentLoaded', toggleSteamEditLoginWarning);
 
     loadSteamStatus();
     connect();

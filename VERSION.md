@@ -1,6 +1,26 @@
 # Version History
 
-## Current Version: 2.12.1
+## Current Version: 2.12.3
+
+### v2.12.3 -- Steam Auth UX and Hardening
+
+**Fixed:**
+- Palworld install failure guidance: `login_required` metadata corrected for Palworld, warning hints added to the create and edit forms when an auth-requiring app is combined with anonymous login, and SteamCMD failure messages containing "Missing configuration" or "No subscription" now carry a remediation hint pointing to authenticated accounts.
+- Workshop installs now pre-seed the Steam Guard TOTP code from the assigned account instead of dropping it.
+- Update checks (`check_update`) now use the server's assigned Steam account for the remote build-id query instead of always logging in anonymously.
+
+**Changed:**
+- The create form auto-unchecks anonymous login when an app requiring authentication is selected (user can re-check; warn-only, no enforcement).
+
+### v2.12.2 -- Auth UI Fixes
+
+**Fixed:**
+- Initial setup page (`/setup`) redesigned to match the current warm-palette login design (atmospheric background grid, login card, accent tokens) instead of the outdated indigo/slate inline styles.
+- Two-factor verification page (`/login/2fa`) converted from an app-shell page (which rendered the sidebar with an empty session) to a standalone centered login-style page with its own recovery-code toggle listener.
+- Security page (`/settings/2fa/setup`) now shows an enrolled state ("2FA is set up" badge) with a password-confirmed deactivate form posting to the previously unreachable `POST /settings/2fa/disable` endpoint, instead of always rendering a fresh QR enrollment form.
+
+**Changed:**
+- All user-visible strings on the setup, 2FA verify, and security pages are now translatable; English and German catalogs extended with 28 new msgids (including the previously untranslated "Security" sidebar label).
 
 ### v2.12.1 -- Startup DB Retry and Repository Restructure
 

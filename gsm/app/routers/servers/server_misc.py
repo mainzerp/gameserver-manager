@@ -189,7 +189,7 @@ async def check_server_update(
     server = await db.get(Server, server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    info = await server_updater.check_update(server)
+    info = await server_updater.check_update(server, db)
     if info and info.get("latest"):
         server.latest_known_version = info["latest"]
         await db.commit()
