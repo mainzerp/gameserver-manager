@@ -4,7 +4,7 @@ services:
     container_name: gameserver_manager
     restart: unless-stopped
     ports:
-      - "${GSM_HOST_PORT:-8443}:8443"
+      - "${GSM_HOST_PORT:-8443}:${GSM_PORT:-8443}"
       # - "2222:2222"               # SFTP access (enable when GSM_SFTP_ENABLED=true)
       - "25565-25575:25565-25575"   # Minecraft Java
       - "19132:19132/udp"            # Minecraft Bedrock

@@ -4,7 +4,7 @@ services:
     container_name: gameserver_manager_test
     restart: "no"
     ports:
-      - "${GSM_HOST_PORT_TEST:-8444}:8443"
+      - "${GSM_HOST_PORT_TEST:-8444}:${GSM_PORT:-8443}"
     environment:
       - TZ=UTC
       - GSM_DEBUG=true
