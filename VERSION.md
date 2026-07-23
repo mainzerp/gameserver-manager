@@ -1,6 +1,17 @@
 # Version History
 
-## Current Version: 2.12.0
+## Current Version: 2.12.1
+
+### v2.12.1 -- Startup DB Retry and Repository Restructure
+
+**Fixed:**
+- Alembic migrations now retry with exponential backoff (10 attempts, 2s–30s) on startup to handle Docker DNS resolution delays on fresh deployments.
+- Docker Compose production stack switched to pre-built image `ghcr.io/mainzerp/gameserver-manager:latest` instead of local build context.
+
+**Changed:**
+- Application source moved into `gsm/` subdirectory with updated pyproject.toml, CI workflows, and documentation.
+- Added isolated `docker-compose.test.yml` test stack with named volumes.
+- Restored textless logo from commit `4d187fce`.
 
 ### v2.12.0 -- Live Telemetry, Query Defaults and Container Release
 
