@@ -1,9 +1,16 @@
+import asyncio
+import functools
+import logging
 from pathlib import Path
 
+from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
+from alembic import command
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 _db_url = settings.database_url
 
@@ -30,17 +37,27 @@ async def get_db() -> AsyncSession:
         yield session
 
 
+_DB_RETRY_MAX = 10
+_DB_RETRY_CAP = 30.0
+
+
 async def init_db():
-    import asyncio
-    import functools
-
-    from alembic.config import Config
-
-    from alembic import command
-
     _alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     alembic_cfg = Config(str(_alembic_ini))
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(
-        None, functools.partial(command.upgrade, alembic_cfg, "head")
-    )
+
+    for attempt in range(1, _DB_RETRY_MAX + 1):
+        try:
+            await loop.run_in_executor(None, functools.partial(command.upgrade, alembic_cfg, "head"))
+            return
+        except Exception:
+            if attempt == _DB_RETRY_MAX:
+                raise
+            wait = min(2.0**attempt, _DB_RETRY_CAP)
+            logger.warning(
+                "Alembic migration failed (attempt %d/%d), retrying in %.0fs...",
+                attempt,
+                _DB_RETRY_MAX,
+                wait,
+            )
+            await asyncio.sleep(wait)
